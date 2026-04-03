@@ -28,7 +28,7 @@ def safe_float(val):
         return None
 
 
-def build_unified_product_fora(json_response):
+def build_unified_product_fora(json_response, category_map=None):
     item = json_response.get('item')
     if not item:
         return None
@@ -67,12 +67,21 @@ def build_unified_product_fora(json_response):
     is_tobacco = attributes['warning_type'] == 'tobacco'
     is_18_plus = attributes['warning_type'] in ['alcohol', 'tobacco'] or attributes['alcohol_percentage'] is not None
 
-    # Категорії (у Форі вони часто null в масиві, тому беремо вкладений об'єкт category)
-    cat_names = [c.get('name') for c in item.get('categories', []) if c.get('name')]
+    # Категорії (з використанням словника-довідника Фори)
+    cat_names = []
+    for c in item.get('categories', []):
+        cat_id = c.get('id')
+        cat_name = c.get('name')
+
+        if cat_name:
+            cat_names.append(cat_name)
+        elif category_map and cat_id in category_map:
+            cat_names.append(category_map[cat_id])
+
     if cat_names:
         category_path = " > ".join(cat_names)
     else:
-        category_path = item.get('category', {}).get('name')
+        category_path = item.get('category', {}).get('name') or "Невідома категорія"
 
     # Ціни
     current_price = item.get('price', 0)
