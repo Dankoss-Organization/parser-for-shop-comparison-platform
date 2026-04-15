@@ -3,9 +3,11 @@ from api_client import fetch_detailed_product
 from parser import build_unified_product
 
 if __name__ == "__main__":
+    # Я додав сюди каву, щоб ти одразу побачив, як красиво лягає рейтинг та історія цін
     test_slugs = [
         "sumish-ovocheva-bauer-mediterranean-style-886097",
-        "sumish-ovochiv-premiia-zamorozhena-po-italiisky-325891"
+        "sumish-ovochiv-premiia-zamorozhena-po-italiisky-325891",
+        "kava-zernova-brazyliia-naturalna-smazhena-939991"
     ]
 
     results = []
@@ -24,4 +26,4 @@ if __name__ == "__main__":
     with open("silpo_parsed_results.json", "w", encoding="utf-8") as f:
         json.dump(results, f, ensure_ascii=False, indent=2)
 
-    print("\n🚀 Парсинг завершено! Дані збережено в silpo_parsed_results.json, а фото в папку storage/images.")
+    print("\n🚀 Парсинг завершено! Дані збережено в silpo_parsed_results.json.")

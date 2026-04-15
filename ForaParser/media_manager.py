@@ -5,11 +5,10 @@ import cloudinary.uploader
 import cloudinary.api
 from cloudinary.exceptions import NotFound
 from config import (
-    STORAGE_DIR, HEADERS,
+    STORAGE_DIR, FORA_HEADERS,
     CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
 )
 
-# Ініціалізуємо підключення до Cloudinary
 cloudinary.config(
     cloud_name=CLOUDINARY_CLOUD_NAME,
     api_key=CLOUDINARY_API_KEY,
@@ -17,16 +16,13 @@ cloudinary.config(
     secure=True
 )
 
-
 def download_and_save_image(raw_url, product_sku, suffix):
-    """
-    Перевіряє чи є фото в хмарі. Якщо немає — завантажує локально і відправляє в Cloudinary.
-    """
     if not raw_url:
         return None
 
     try:
-        cloud_file_name = f"silpo_products/{product_sku}_{suffix}"
+        # Змінили папку на fora_products
+        cloud_file_name = f"fora_products/{product_sku}_{suffix}"
 
         # 1. ПЕРЕВІРКА В CLOUDINARY
         try:
@@ -39,7 +35,7 @@ def download_and_save_image(raw_url, product_sku, suffix):
         # 2. ЯКЩО ФАЙЛУ НЕМАЄ, СКАЧУЄМО ЛОКАЛЬНО
         ext = raw_url.split('.')[-1]
         if len(ext) > 4 or '?' in ext:
-            ext = "jpg"
+            ext = "png" # Фора часто використовує png
 
         new_filename = f"{product_sku}_{suffix}.{ext}"
         local_filepath = os.path.join(STORAGE_DIR, new_filename)
@@ -47,12 +43,7 @@ def download_and_save_image(raw_url, product_sku, suffix):
         print(f"    ⬇️ [ЗАВАНТАЖЕННЯ] Качаємо нове фото: {new_filename}...")
 
         if not os.path.exists(local_filepath):
-            response = requests.get(raw_url, headers=HEADERS, stream=True, timeout=10)
-
-            if response.status_code == 404 and "1000x1000/webp/" in raw_url:
-                fallback_url = raw_url.replace("1000x1000/webp/", "")
-                response = requests.get(fallback_url, headers=HEADERS, stream=True, timeout=10)
-
+            response = requests.get(raw_url, headers=FORA_HEADERS, stream=True, timeout=10)
             response.raise_for_status()
 
             with open(local_filepath, 'wb') as file:

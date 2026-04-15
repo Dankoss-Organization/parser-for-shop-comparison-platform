@@ -61,41 +61,31 @@ def build_unified_product(raw_data):
     is_national_cashback = any(p.get('id') == 'national-cashback' for p in raw_data.get('promotions', []))
     is_online_only = any(p.get('id') == 'only_online' for p in raw_data.get('promotions', []))
 
-    # Аналізуємо складні акції (SpecialPrices: Гуртом або 2+1)
+    # Оптові знижки (bulk discounts)
     bulk_discounts = []
     for sp in raw_data.get('specialPrices', []):
         sp_type = sp.get('type')
         if sp_type == 'from':
-            bulk_discounts.append({
-                "discount_type": "bulk_price",
-                "min_quantity": sp.get('count'),
-                "price_per_unit": sp.get('price'),
-                "description": f"Ціна {sp.get('price')} грн при купівлі від {sp.get('count')} шт"
-            })
+            bulk_discounts.append(
+                {"discount_type": "bulk_price", "min_quantity": sp.get('count'), "price_per_unit": sp.get('price'),
+                 "description": f"Ціна {sp.get('price')} грн при купівлі від {sp.get('count')} шт"})
         elif sp_type == 'every':
-            bulk_discounts.append({
-                "discount_type": "nth_item_discount",
-                "min_quantity": sp.get('count'),
-                "price_for_nth_item": sp.get('price'),
-                "description": f"Кожна {sp.get('count')}-тя одиниця за {sp.get('price')} грн"
-            })
+            bulk_discounts.append({"discount_type": "nth_item_discount", "min_quantity": sp.get('count'),
+                                   "price_for_nth_item": sp.get('price'),
+                                   "description": f"Кожна {sp.get('count')}-тя одиниця за {sp.get('price')} грн"})
 
     # Зображення
     raw_images = raw_data.get('media', [])
     raw_gallery_urls = [f"{SILPO_BASE_IMG_URL}{img}" for img in raw_images]
     raw_main_image_url = raw_gallery_urls[0] if raw_gallery_urls else None
 
-    # Проходимося по фотографіях лише один раз!
     new_gallery = []
     for idx, raw_img_url in enumerate(raw_gallery_urls):
-        # Якщо це перше фото (індекс 0), даємо йому суфікс 'main', інакше 'gallery_1', 'gallery_2' тощо
         suffix = "main" if idx == 0 else f"gallery_{idx}"
-
         new_gallery_img = download_and_save_image(raw_img_url, product_sku, suffix)
         if new_gallery_img:
             new_gallery.append(new_gallery_img)
 
-    # Головне фото — це просто перше посилання з нашого збереженого списку
     new_main_image = new_gallery[0] if new_gallery else None
 
     return {
@@ -121,35 +111,22 @@ def build_unified_product(raw_data):
             "description": raw_data.get('descriptionRich') or raw_data.get('description')
         },
         "offers": [{
-            "store_id": "s_silpo",
-            "store_name": "Сільпо",
-            "url": f"https://silpo.ua/product/{raw_data.get('slug')}",
-            "is_in_stock": raw_data.get('stock', 0) > 0,
-            "sku": str(raw_data.get('externalProductId')),
+            "store_id": "s_silpo", "store_name": "Сільпо", "url": f"https://silpo.ua/product/{raw_data.get('slug')}",
+            "is_in_stock": raw_data.get('stock', 0) > 0, "sku": str(raw_data.get('externalProductId')),
             "scraped_at": current_time,
-
-            # Перенесли рейтинг сюди
             "store_rating": {
                 "rating": raw_data.get('guestProductRating'),
                 "reviews_count": raw_data.get('guestProductRatingCount')
             },
-
             "pricing": {
-                "regular_price": regular_price,
-                "current_price": current_price,
-                "discount_percent": discount_percent,
-                "is_online_only": is_online_only,
-                "promo_end_date": promo_end,
-                "bulk_discounts": bulk_discounts # Той самий блок оптових знижок
+                "regular_price": regular_price, "current_price": current_price,
+                "discount_percent": discount_percent, "is_online_only": is_online_only,
+                "promo_end_date": promo_end, "bulk_discounts": bulk_discounts
             },
-
-            # Закладаємо фундамент для історії цін (записуємо поточну ціну як першу точку)
-            "price_history": [
-                {
-                    "date": current_time,
-                    "price": current_price,
-                    "regular_price": regular_price
-                }
-            ]
+            "price_history": [{
+                "date": current_time,
+                "price": current_price,
+                "regular_price": regular_price
+            }]
         }]
     }
