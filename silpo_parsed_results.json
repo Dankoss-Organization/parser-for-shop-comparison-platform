@@ -1,0 +1,138 @@
+[
+  {
+    "product_id": "silpo_886097",
+    "canonical_name": "Суміш овочева Bauer Mediterranean style",
+    "brand": "Bauer",
+    "category": "Заморожена продукція > Овочі і фрукти заморожені > Овочі заморожені",
+    "country": "Польща",
+    "media": {
+      "raw_main_image": "https://images.silpo.ua/v2/products/1000x1000/webp/fb656b2d-fefc-46df-9cc2-5cceeb3f553e.png",
+      "raw_gallery": [
+        "https://images.silpo.ua/v2/products/1000x1000/webp/fb656b2d-fefc-46df-9cc2-5cceeb3f553e.png",
+        "https://images.silpo.ua/v2/products/1000x1000/webp/fa52116a-1d2e-4981-9fe8-05d6a017e8b0.jpg"
+      ],
+      "main_image": "https://res.cloudinary.com/dujpbhvfx/image/upload/v1774456579/silpo_products/silpo_886097_main.webp",
+      "gallery": [
+        "https://res.cloudinary.com/dujpbhvfx/image/upload/v1774456579/silpo_products/silpo_886097_main.webp",
+        "https://res.cloudinary.com/dujpbhvfx/image/upload/v1774456581/silpo_products/silpo_886097_gallery_1.webp"
+      ]
+    },
+    "measurements": {
+      "value": 400.0,
+      "unit": "g"
+    },
+    "pricing_logic": {
+      "sales_unit": "piece",
+      "unit_step": 1
+    },
+    "specific_attributes": {
+      "calories": "36/153",
+      "proteins_g": 1.9,
+      "fats_g": 0.3,
+      "carbohydrates_g": 4.9,
+      "alcohol_percentage": null,
+      "is_tobacco": false,
+      "is_18_plus": false,
+      "is_national_cashback_eligible": false,
+      "description": "no desc yet"
+    },
+    "offers": [
+      {
+        "store_id": "s_silpo",
+        "store_name": "Сільпо",
+        "url": "https://silpo.ua/product/sumish-ovocheva-bauer-mediterranean-style-886097",
+        "is_in_stock": true,
+        "sku": "886097",
+        "scraped_at": "2026-04-15T11:11:00Z",
+        "store_rating": {
+          "rating": 4.7,
+          "reviews_count": 40
+        },
+        "pricing": {
+          "regular_price": 127,
+          "current_price": 99,
+          "discount_percent": 22,
+          "is_online_only": false,
+          "promo_end_date": "2026-04-21T00:00:00+00:00",
+          "bulk_discounts": []
+        },
+        "price_history": [
+          {
+            "date": "2026-04-15T11:11:00Z",
+            "price": 99,
+            "regular_price": 127
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "product_id": "silpo_939991",
+    "canonical_name": "Кава зернова Бразилія натуральна смажена",
+    "brand": "Власне обсмажування",
+    "category": "Кава, чай > Кава > Кава власного обсмаження",
+    "country": "Україна",
+    "media": {
+      "raw_main_image": "https://images.silpo.ua/v2/products/1000x1000/webp/6930fa06-cf86-4ef3-90b7-bf910cd5f905.png",
+      "raw_gallery": [
+        "https://images.silpo.ua/v2/products/1000x1000/webp/6930fa06-cf86-4ef3-90b7-bf910cd5f905.png",
+        "https://images.silpo.ua/v2/products/1000x1000/webp/549078d0-10a0-4725-a2fd-dffc907c93a5.jpg",
+        "https://images.silpo.ua/v2/products/1000x1000/webp/c6d39802-43b0-438f-9708-5f3ae9183b99.jpg"
+      ],
+      "main_image": "https://res.cloudinary.com/dujpbhvfx/image/upload/v1774456588/silpo_products/silpo_939991_main.webp",
+      "gallery": [
+        "https://res.cloudinary.com/dujpbhvfx/image/upload/v1774456588/silpo_products/silpo_939991_main.webp",
+        "https://res.cloudinary.com/dujpbhvfx/image/upload/v1774456590/silpo_products/silpo_939991_gallery_1.webp",
+        "https://res.cloudinary.com/dujpbhvfx/image/upload/v1774456593/silpo_products/silpo_939991_gallery_2.webp"
+      ]
+    },
+    "measurements": {
+      "value": 1.0,
+      "unit": "kg"
+    },
+    "pricing_logic": {
+      "sales_unit": "piece",
+      "unit_step": 1
+    },
+    "specific_attributes": {
+      "calories": null,
+      "proteins_g": null,
+      "fats_g": null,
+      "carbohydrates_g": null,
+      "alcohol_percentage": null,
+      "is_tobacco": false,
+      "is_18_plus": false,
+      "is_national_cashback_eligible": true,
+      "description": "no desc yet"
+    },
+    "offers": [
+      {
+        "store_id": "s_silpo",
+        "store_name": "Сільпо",
+        "url": "https://silpo.ua/product/kava-zernova-brazyliia-naturalna-smazhena-939991",
+        "is_in_stock": true,
+        "sku": "939991",
+        "scraped_at": "2026-04-15T11:11:01Z",
+        "store_rating": {
+          "rating": 4.3,
+          "reviews_count": 43
+        },
+        "pricing": {
+          "regular_price": 1399,
+          "current_price": 1119,
+          "discount_percent": 20,
+          "is_online_only": false,
+          "promo_end_date": "2026-04-20T00:00:00+00:00",
+          "bulk_discounts": []
+        },
+        "price_history": [
+          {
+            "date": "2026-04-15T11:11:01Z",
+            "price": 1119,
+            "regular_price": 1399
+          }
+        ]
+      }
+    ]
+  }
+]
