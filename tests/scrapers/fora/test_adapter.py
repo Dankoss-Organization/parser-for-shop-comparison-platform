@@ -1,30 +1,70 @@
+"""
+Unit tests for the ForaAdapter class.
+
+This module verifies the data transformation logic specifically tailored
+for the Fora supermarket's API. It ensures that raw JSON responses are
+correctly mapped to the system's unified product schema, handling prices,
+measurements, promotional tags, and missing data gracefully.
+"""
+
 import pytest
 from unittest.mock import MagicMock
 from scrapers.fora.adapter import ForaAdapter
 
 
 class TestForaAdapter:
+    """
+    Test suite for the Fora data adapter.
+
+    These tests validate the parsing of nested JSON structures, the calculation
+    of discount percentages, the extraction of specific attributes (like
+    national cashback), and the robust handling of missing or null fields.
+    """
 
     @pytest.fixture
     def adapter(self):
-        """Фікстура, яка створює екземпляр адаптера перед кожним тестом"""
+        """
+        Fixture that provides a fresh instance of the ForaAdapter.
+
+        Returns:
+            ForaAdapter: The adapter instance to be tested before each test run.
+        """
         return ForaAdapter()
 
     @pytest.fixture
     def mock_media_proxy(self):
-        """Створюємо фейковий media_proxy, щоб не робити реальних запитів у Cloudinary"""
+        """
+        Fixture that creates a fake media proxy to bypass external network calls.
+
+        This ensures tests run quickly and do not attempt to actually upload
+        images to Cloudinary during the automated test suite execution.
+
+        Returns:
+            MagicMock: A mocked proxy that constantly returns a static fake image URL.
+        """
         proxy = MagicMock()
-        # Вказуємо, що при виклику process_image він завжди має повертати цей рядок:
+        # Specifying that whenever process_image is called, it must return this string:
         proxy.process_image.return_value = "https://mocked.cloudinary.url/image.png"
         return proxy
 
     def test_normalize_empty_data(self, adapter, mock_media_proxy):
-        """Якщо API повернуло порожній словник або немає ключа 'item', повертаємо None"""
+        """
+        Tests the adapter's behavior when provided with empty or invalid data.
+
+        Verifies that if the API returns an empty dictionary or lacks the
+        core 'item' key, the adapter safely returns None.
+        """
         assert adapter.normalize({}, mock_media_proxy) is None
         assert adapter.normalize({"error": "not found"}, mock_media_proxy) is None
 
     def test_normalize_full_product(self, adapter, mock_media_proxy):
-        """Тест повноцінного товару з усіма полями, знижкою та кешбеком"""
+        """
+        Tests the complete normalization process for a fully populated product payload.
+
+        Verifies the accurate mapping of base fields, the correct calculation
+        of discounts, the extraction of nested attributes (calories, brand),
+        and the processing of promotional bubbles (e.g., national cashback).
+        """
         raw_json = {
             "item": {
                 "id": 523478,
@@ -52,14 +92,14 @@ class TestForaAdapter:
 
         result = adapter.normalize(raw_json, mock_media_proxy)
 
-        # 1. Базові поля
+        # 1. Base fields validation
         assert result["product_id"] == "fora_523478"
         assert result["canonical_name"] == "Шоколад молочний Milka Bubbles"
         assert result["brand"] == "Milka"
         assert result["country"] == "Україна"
         assert result["category"] == "Шоколад, плитка"
 
-        # 2. Логіка ціни та знижки (89.9 -> 64.9 це знижка ~28%)
+        # 2. Pricing and discount logic validation (89.9 -> 64.9 is ~28% discount)
         offer = result["offers"][0]
         assert offer["store_name"] == "Фора"
         assert offer["is_in_stock"] is True
@@ -67,25 +107,30 @@ class TestForaAdapter:
         assert offer["pricing"]["regular_price"] == 89.9
         assert offer["pricing"]["discount_percent"] == 28
 
-        # 3. Специфічні атрибути (Кешбек)
+        # 3. Specific attributes validation (Cashback)
         assert result["specific_attributes"]["calories"] == "532/2225"
         assert result["specific_attributes"]["is_national_cashback_eligible"] is True
 
-        # 4. Перевірка ваги (має відпрацювати наш протестований BaseAdapter)
+        # 4. Measurement validation (Should be processed by the tested BaseAdapter logic)
         assert result["measurements"]["value"] == 80.0
         assert result["measurements"]["unit"] == "g"
 
-        # 5. Перевірка картинок (має підставитися фейк з нашого mock_media_proxy)
+        # 5. Image validation (Should use the injected mock_media_proxy response)
         assert result["media"]["main_image"] == "https://mocked.cloudinary.url/image.png"
 
     def test_normalize_regular_price_no_discount(self, adapter, mock_media_proxy):
-        """Перевірка логіки, коли товар без акції (oldPrice відсутній або менший)"""
+        """
+        Tests the pricing logic for products without active promotions.
+
+        Verifies that when 'oldPrice' is absent or lower than the current price,
+        the regular price equals the current price, and the discount is calculated as 0.
+        """
         raw_json = {
             "item": {
                 "id": 111,
                 "name": "Хліб",
                 "price": 25.0,
-                # oldPrice немає
+                # oldPrice is absent
             }
         }
 
@@ -97,18 +142,24 @@ class TestForaAdapter:
         assert offer["pricing"]["discount_percent"] == 0
 
     def test_normalize_missing_parameters_and_bubbles(self, adapter, mock_media_proxy):
-        """Перевірка стійкості (захист від NoneType), якщо API не прислало масиви"""
+        """
+        Tests robust handling of null values for list-based API fields.
+
+        Verifies that the adapter correctly uses fallback empty lists `(or [])`
+        when the API returns `None` for parameters, bubbles, or categories,
+        preventing 'NoneType is not iterable' exceptions.
+        """
         raw_json = {
             "item": {
                 "id": 222,
                 "name": "Товар без інфи",
-                "parameters": None,  # Може бути None замість []
+                "parameters": None,  # Might be None instead of an empty list []
                 "bubbles": None,
                 "category": None
             }
         }
 
-        # Якщо код не впаде з помилкою NoneType, значить тест пройдено
+        # If the code does not crash with a TypeError, the test is passed successfully
         result = adapter.normalize(raw_json, mock_media_proxy)
 
         assert result["brand"] is None
