@@ -1,7 +1,8 @@
-from sqlalchemy import Column, String, Float, Boolean, DateTime, ForeignKey
+from sqlalchemy import Column, String, Float, Boolean, DateTime, ForeignKey, Integer
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import declarative_base, relationship
+from sqlalchemy.orm import relationship, declarative_base
 from datetime import datetime, timezone
+from sqlalchemy.orm import declarative_base # Новий шлях
 
 Base = declarative_base()
 
@@ -62,3 +63,14 @@ class Offer(Base):
 
     # Зв'язок
     product = relationship("Product", back_populates="offers")
+
+class PriceHistory(Base):
+    __tablename__ = "price_history"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    product_id = Column(String, ForeignKey("products.product_id"), nullable=False)
+    price = Column(Float, nullable=False)
+    scraped_at = Column(DateTime, nullable=False)
+
+    # Зв'язок з основною таблицею (опціонально, але корисно)
+    product = relationship("Product", back_populates="price_history")
