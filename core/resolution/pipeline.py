@@ -41,7 +41,7 @@ class SlowTrackPipeline:
 
         print(f"   🤖 ML Аналіз: '{new_item_clean}' -> Збіг {score * 100:.1f}%")
 
-        if score >= 0.85:  # Наш жорсткий поріг (85%)
+        if score >= 0.96:
             return best_match_id
 
         return None

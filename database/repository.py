@@ -82,6 +82,21 @@ class Repository:
 
     def create_offer(self, product_id: str, offer_data: dict, store_sku: str):
         try:
+            # Спочатку перевіряємо, чи вже є оффер для цього товару в цьому магазині
+            existing_offer = self.db.query(Offer).filter(
+                Offer.product_id == product_id,
+                Offer.store_id == offer_data.get('store_id')
+            ).first()
+
+            if existing_offer:
+                # Якщо оффер є, просто оновлюємо ціну та SKU
+                existing_offer.current_price = offer_data['pricing']['current_price']
+                existing_offer.store_sku = store_sku
+                self.db.commit()
+                print(f"   🔄 Оновлено існуючу пропозицію в магазині (ID: {existing_offer.id})")
+                return existing_offer.id
+
+            # Якщо офферу немає, створюємо новий
             offer_id = str(uuid.uuid4())
             offer = Offer(
                 id=offer_id,
@@ -93,6 +108,7 @@ class Repository:
             self.db.add(offer)
             self.db.commit()
             return offer_id
+
         except Exception as e:
-            self.db.rollback()  # Відкочуємо транзакцію при збої
+            self.db.rollback()
             raise e
