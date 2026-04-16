@@ -2,7 +2,12 @@ name: Python Tests CI
 
 on:
   push:
-    branches: [ "main", "feat/*", "test/*", "ci/*" ]
+    branches:
+      - "main"
+      - "feat/*"
+      - "test/*"
+      - "ci/*"
+      - "kristina/**"
   pull_request:
     branches: [ "main" ]
 
