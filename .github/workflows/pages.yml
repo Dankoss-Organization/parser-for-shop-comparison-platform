@@ -42,9 +42,11 @@ jobs:
 
       - name: Generate pdoc HTML
         run: |
-          export PYTHONPATH=$PYTHONPATH:.
-          # Генеруємо HTML-документацію у папку docs
-          pdoc ./core ./database ./scrapers -o ./docs
+          export PYTHONPATH=$PYTHONPATH:$(pwd)
+          
+          touch core/__init__.py database/__init__.py scrapers/__init__.py
+          
+          pdoc core database scrapers -o ./docs
 
       - name: Setup GitHub Pages
         uses: actions/configure-pages@v4
