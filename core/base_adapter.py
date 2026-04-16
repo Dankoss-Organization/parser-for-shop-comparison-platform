@@ -3,11 +3,10 @@ import re
 class BaseAdapter:
     @staticmethod
     def parse_measurements(ratio_str):
-        # Загальна логіка розбору ваги, яка була однаковою у двох файлах
         if not ratio_str:
             return {"value": 1.0, "unit": "pcs"}
 
-        match = re.match(r"([\d\.,]+)\s*([а-яa-zA-Z]+)", str(ratio_str).lower().strip().replace(',', '.'))
+        match = re.match(r"([\d\.,]+)\s*([а-яіїєґa-zA-Z]+)", str(ratio_str).lower().strip().replace(',', '.'))
         if match:
             val = float(match.group(1))
             unit = match.group(2)
