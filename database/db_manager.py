@@ -7,6 +7,7 @@ Platform, handling connection pooling and session lifecycle management.
 """
 
 import os
+from typing import Optional
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from dotenv import load_dotenv
