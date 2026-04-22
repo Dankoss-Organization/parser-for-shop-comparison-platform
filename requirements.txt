@@ -4,3 +4,4 @@ sqlalchemy
 python-dotenv
 pdoc
 cloudinary
+sentence-transformers
