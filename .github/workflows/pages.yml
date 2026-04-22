@@ -44,7 +44,7 @@ jobs:
           
           find core database scrapers -type d -exec touch {}/__init__.py \;
           
-          pdoc . core database scrapers -o ./docs --docformat google
+          pdoc core database scrapers -o ./docs --docformat google
 
       - name: Setup GitHub Pages
         uses: actions/configure-pages@v4

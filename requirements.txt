@@ -3,3 +3,4 @@ requests
 sqlalchemy
 python-dotenv
 pdoc
+cloudinary
