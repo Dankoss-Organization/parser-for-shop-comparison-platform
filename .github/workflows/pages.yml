@@ -1,0 +1,61 @@
+name: Generate and Deploy API Documentation
+
+# Цей екшен буде запускатися тільки тоді, коли ти пушиш код у гілку main
+on:
+  push:
+    branches:
+      - main  # Якщо твоя головна гілка називається master, заміни main на master
+
+# Ці дозволи є обов'язковими для того, щоб GitHub Actions міг створити сайт
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Запобігає паралельним запускам, щоб старі коміти не перебили нові
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  deploy-docs:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }} # Сюди автоматично запишеться лінк на сайт
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11' 
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # pdoc потрібно знати твої залежності, щоб проаналізувати код
+          pip install -r requirements.txt 
+          pip install pdoc
+
+      - name: Generate pdoc HTML
+        run: |
+          export PYTHONPATH=$PYTHONPATH:$(pwd)
+          
+          find core database scrapers -type d -exec touch {}/__init__.py \;
+          
+          pdoc . core database scrapers -o ./docs --docformat google
+
+      - name: Setup GitHub Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: './docs'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

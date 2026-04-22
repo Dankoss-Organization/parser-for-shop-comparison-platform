@@ -1,76 +1,48 @@
-import os
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from dotenv import load_dotenv
-from database.models import Product, PriceHistory
+"""
+Unit tests for the db_manager module.
 
-load_dotenv()
+Verifies the correct initialization of the database session generator
+and ensures that database connections are properly opened and safely closed.
+"""
+
+import pytest
+from unittest.mock import patch, MagicMock
+from database.db_manager import get_db
 
 
-class DatabaseManager:
-    def __init__(self):
-        self.db_url = os.getenv("DATABASE_URL")
-        if not self.db_url:
-            raise ValueError("❌ Не знайдено DATABASE_URL у файлі .env!")
+class TestDBManager:
+    """
+    Test suite for database connection utilities.
+    """
 
-        # Налаштовуємо підключення
-        self.engine = create_engine(self.db_url, pool_pre_ping=True)
-        self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
+    @patch('database.db_manager.SessionLocal')
+    def test_get_db_yields_session_and_closes(self, mock_session_local):
+        """
+        Tests the get_db generator function.
 
-    def upsert_product(self, product_data: dict):
-        """Додає новий товар або оновлює існуючий (Upsert)"""
-        session = self.SessionLocal()
-        try:
-            product_id = product_data.get("product_id")
-            # Шукаємо, чи є вже такий товар
-            product = session.query(Product).filter(Product.product_id == product_id).first()
+        Ensures that a session is yielded for database operations and
+        that the session is securely closed in the finally block after use,
+        preventing connection leaks.
 
-            main_offer = product_data['offers'][0]
-            current_price = main_offer['pricing']['current_price']
-            regular_price = main_offer['pricing']['regular_price']
-            scraped_at = main_offer['scraped_at']
+        Args:
+            mock_session_local (MagicMock): Mocked SQLAlchemy sessionmaker.
+        """
+        mock_session = MagicMock()
+        mock_session_local.return_value = mock_session
 
-            if not product:
-                # Створюємо новий товар
-                product = Product(
-                    product_id=product_id,
-                    canonical_name=product_data.get("canonical_name"),
-                    brand=product_data.get("brand"),
-                    category=product_data.get("category"),
-                    country=product_data.get("country"),
-                    main_image=product_data.get("media", {}).get("main_image"),
-                    current_price=current_price,
-                    regular_price=regular_price,
-                    last_updated=scraped_at
-                )
-                session.add(product)
-            else:
-                # Оновлюємо існуючий
-                product.current_price = current_price
-                product.regular_price = regular_price
-                product.last_updated = scraped_at
+        # Отримуємо генератор
+        db_generator = get_db()
 
-            # Додаємо запис в історію цін
-            history_entry = PriceHistory(
-                product_id=product_id,
-                price=current_price,
-                scraped_at=scraped_at
-            )
-            session.add(history_entry)
+        # Робимо перший крок (yield)
+        db = next(db_generator)
 
-            session.commit()
-            return product
-        except Exception as e:
-            session.rollback()
-            print(f"❌ Помилка при збереженні товару {product_id}: {e}")
-            raise e
-        finally:
-            session.close()
+        # Перевіряємо, що повернулася правильна сесія, і вона ще не закрита
+        assert db == mock_session
+        mock_session.close.assert_not_called()
 
-    def get_all_products(self):
-        """Повертає всі товари з бази"""
-        session = self.SessionLocal()
-        try:
-            return session.query(Product).all()
-        finally:
-            session.close()
+        # Імітуємо завершення роботи з базою (спрацьовує блок finally)
+        with pytest.raises(StopIteration):
+            next(db_generator)
+
+        # Найважливіша перевірка: чи закрилася сесія після використання
+        mock_session.close.assert_called_once()

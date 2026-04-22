@@ -1,9 +1,53 @@
+from typing import Dict, Any, Optional
 from datetime import datetime, timezone
 from core.base_adapter import BaseAdapter
 from config import SILPO_BASE_IMG_URL, SILPO_HEADERS
 
 class SilpoAdapter(BaseAdapter):
-    def normalize(self, raw_data, media_proxy):
+    """
+    Adapter responsible for transforming raw Silpo supermarket API responses
+    into the platform's unified product schema.
+
+    This class extends `BaseAdapter` and implements the specific parsing logic
+    required to handle Silpo's complex backend structure. It extracts nested
+    attribute groups, computes dynamic pricing logic (including bulk discounts),
+    identifies promotional flags, and delegates image handling to the media proxy.
+    """
+
+    def normalize(self, raw_data: Dict[str, Any], media_proxy: Any) -> Optional[Dict[str, Any]]:
+        """
+        Normalizes a single product's raw JSON data from the Silpo API.
+
+        Logic Flow:
+        1. **Data Validation:** Checks for the presence of `raw_data`. Returns
+           None if the input is empty or invalid.
+        2. **Attribute Extraction:** Iterates through nested `attributeGroups` to
+           extract crucial nested data such as 'country', 'brand', and detailed
+           nutritional facts ('calorie', 'proteins', 'fats', 'carbohydrates').
+        3. **Pricing Calculation:** Evaluates 'price' and 'oldPrice'. Safely
+           calculates the regular price and the exact discount percentage.
+        4. **Promotions & Bulk Logic:** Scans the 'promotions' array for tags like
+           "national-cashback" and "only_online". Parses the 'specialPrices' array
+           to extract complex bulk discount rules (e.g., "buy N for X price"
+           or "every Nth item discounted").
+        5. **Media Processing:** Iterates over available raw images, forwarding
+           them to the `media_proxy` for download and Cloudinary upload. It utilizes
+           a specific `fallback_replace` parameter ("1000x1000/webp/") to handle
+           Silpo's specific 404 image resolution errors on the fly.
+        6. **Schema Construction:** Assembles all extracted data into the
+           standardized dictionary format required by the resolution pipeline.
+
+        Args:
+            raw_data (Dict[str, Any]): The raw JSON dictionary returned by
+                the Silpo API endpoint.
+            media_proxy (Any): An instance of the media proxy service (e.g.,
+                CloudinaryImageProxy) used to process, cache, and host images.
+
+        Returns:
+            Optional[Dict[str, Any]]: The fully populated and standardized
+            product dictionary ready for the routing pipeline, or None if the
+            input data is empty.
+        """
         if not raw_data: return None
 
         current_time = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
