@@ -3,6 +3,8 @@ from scrapers.silpo.scraper import SilpoScraper
 from scrapers.silpo.adapter import SilpoAdapter
 from scrapers.fora.scraper import ForaScraper
 from scrapers.fora.adapter import ForaAdapter
+from scrapers.varus.scraper import VarusScraper
+from scrapers.varus.adapter import VarusAdapter
 from core.media_proxy import CloudinaryImageProxy
 
 
@@ -63,5 +65,8 @@ class ParserFactory:
             return SilpoScraper(SilpoAdapter(), media_proxy)
         elif store_name == "fora":
             return ForaScraper(ForaAdapter(), media_proxy)
+        elif store_name == "varus":
+            adapter = VarusAdapter()
+            return VarusScraper(adapter=adapter, media_proxy=media_proxy)
         else:
             raise ValueError(f"Магазин {store_name} не підтримується")
