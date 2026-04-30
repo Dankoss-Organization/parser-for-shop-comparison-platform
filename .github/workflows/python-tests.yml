@@ -1,0 +1,41 @@
+name: Python Tests CI
+
+on:
+  push:
+    branches:
+      - "main"
+      - "feat/*"
+      - "test/*"
+      - "ci/*"
+      - "kristina/**"
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pytest requests cloudinary sentence-transformers torch sqlalchemy psycopg2-binary python-dotenv
+
+    - name: Run tests with pytest
+      env:
+        # Додаємо фейкові змінні оточення, щоб тести не падали через їх відсутність
+        CLOUDINARY_CLOUD_NAME: "test"
+        CLOUDINARY_API_KEY: "test"
+        CLOUDINARY_API_SECRET: "test"
+        DATABASE_URL: "postgresql+psycopg2://user:pass@localhost/db"
+      run: |
+        export PYTHONPATH=$PYTHONPATH:.
+        python -m pytest tests/
