@@ -41,7 +41,7 @@ class SlowTrackPipeline:
         3. **Candidate Selection:** Queries the database for all existing products
            sharing the exact same brand and numerical measurement value.
         4. **Text Normalization:** Cleans the canonical name of the new item and
-           all identified candidates to remove promotional noise and stop-words.
+           all identified    candidates to remove promotional noise and stop-words.
         5. **Semantic ML Analysis:** Compares the cleaned names using deep
            learning embeddings. If the similarity score (Cosine Similarity) meets
            or exceeds the threshold (0.96), a match is confirmed.
