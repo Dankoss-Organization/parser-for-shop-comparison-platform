@@ -66,7 +66,6 @@ class ParserFactory:
         elif store_name == "fora":
             return ForaScraper(ForaAdapter(), media_proxy)
         elif store_name == "varus":
-            adapter = VarusAdapter()
-            return VarusScraper(adapter=adapter, media_proxy=media_proxy)
+            return VarusScraper(VarusAdapter(), media_proxy)
         else:
             raise ValueError(f"Магазин {store_name} не підтримується")
