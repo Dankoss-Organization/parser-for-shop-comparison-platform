@@ -45,8 +45,8 @@ if __name__ == "__main__":
     router = EntityRouter()
 
     try:
+        process_store("varus", router)
         process_store("silpo", router)
-
         process_store("fora", router)
 
     finally:
