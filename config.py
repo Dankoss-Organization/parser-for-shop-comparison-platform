@@ -29,6 +29,42 @@ FORA_HEADERS = {
     'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/145.0.0.0 Safari/537.36',
 }
 
+# config.py
+
+# ... твої інші налаштування ...
+
+# Конфігурація для магазинів екосистеми Zakaz.ua
+ZAKAZ_STORES = {
+    "novus": {
+        "id": "48201031",
+        "name": "Novus"
+    },
+    "auchan": {
+        "id": "48246401",
+        "name": "Auchan"
+    },
+    "megamarket": {
+        "id": "48267602",
+        "name": "Megamarket"
+    },
+    "ekomarket": {
+        "id": "482800245",
+        "name": "Ekomarket"
+    },
+    "torba": {
+        "id": "482867220",
+        "name": "Torba"
+    },
+    "ultramarket": {
+        "id": "48277601",
+        "name": "Ultramarket"
+    },
+    "metro": {
+        "id": "48215611",
+        "name": "Metro"
+    }
+}
+
 VARUS_STORES = {
     "Борщаговка_с_Софиевская_Борщаговка_ул_Леси_Украинки_30": "139224",
     "Бровары_ул_Героев_Украины_16_ТД_Лиза": "130727",

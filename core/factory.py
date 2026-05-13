@@ -5,9 +5,12 @@ from scrapers.fora.scraper import ForaScraper
 from scrapers.fora.adapter import ForaAdapter
 from scrapers.varus.scraper import VarusScraper
 from scrapers.varus.adapter import VarusAdapter
-from scrapers.novus.scraper import NovusScraper
-from scrapers.novus.adapter import NovusAdapter
+from scrapers.zakaz.scraper import ZakazScraper
+from scrapers.zakaz.adapter import ZakazAdapter
+from scrapers.zakaz.api_client import ZakazApiClient
 from core.media_proxy import CloudinaryImageProxy
+
+from config import ZAKAZ_STORES
 
 
 class ParserFactory:
@@ -43,15 +46,15 @@ class ParserFactory:
                 - `"silpo"`
                 - `"fora"`
                 - `"varus"`
-                - `"novus"`
+                - Any store defined in `ZAKAZ_STORES` config (e.g., `"novus"`, `"auchan"`)
 
         Returns:
-            Any: An instantiated store scraper object (e.g., `SilpoScraper` or `ForaScraper`).
+            Any: An instantiated store scraper object (e.g., `SilpoScraper` or `ZakazScraper`).
             These objects inherently implement the interface defined by `BaseScraper`.
 
         Raises:
             ValueError: If the provided `store_name` does not match any registered
-                parsers in the factory.
+                parsers in the factory or config.
 
         Examples:
             >>> scraper = ParserFactory.create_scraper("silpo")
@@ -64,14 +67,25 @@ class ParserFactory:
             ValueError: Магазин atb не підтримується
         """
         media_proxy = CloudinaryImageProxy()
+        store_name = store_name.lower()
 
+        # Незалежні парсери
         if store_name == "silpo":
             return SilpoScraper(SilpoAdapter(), media_proxy)
         elif store_name == "fora":
             return ForaScraper(ForaAdapter(), media_proxy)
         elif store_name == "varus":
             return VarusScraper(VarusAdapter(), media_proxy)
-        elif store_name == "novus":
-            return NovusScraper(NovusAdapter(), media_proxy)
+
+        # Універсальний парсер для екосистеми Zakaz.ua (Novus, Auchan, Megamarket...)
+        elif store_name in ZAKAZ_STORES:
+            store_config = ZAKAZ_STORES[store_name]
+
+            # Створюємо клієнт та адаптер, передаючи їм параметри з config.py
+            api_client = ZakazApiClient(store_id=store_config["id"], chain_name=store_name)
+            adapter = ZakazAdapter(chain_name=store_name, display_name=store_config["name"])
+
+            return ZakazScraper(api_client, adapter, media_proxy)
+
         else:
-            raise ValueError(f"Магазин {store_name} не підтримується")
+            raise ValueError(f"Магазин '{store_name}' не підтримується")

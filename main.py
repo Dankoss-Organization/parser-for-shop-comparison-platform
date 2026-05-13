@@ -29,7 +29,7 @@ def process_store(store_name, router):
             except Exception as e:
                 print(f"🛑 КРИТИЧНА ПОМИЛКА на товарі {slug}! Парсинг магазину зупинено.")
                 print(f"Деталі помилки: {e}")
-                router.db.rollback()
+                router.repo.session.rollback()
                 break
 
     except NotImplementedError as e:
@@ -44,12 +44,31 @@ if __name__ == "__main__":
     print("🧠 Ініціалізація ядра метчингу та підключення до бази даних...")
     router = EntityRouter()
 
-    try:
-        process_store("novus", router)
-        process_store("varus", router)
-        process_store("silpo", router)
-        process_store("fora", router)
+    # ==========================================
+    # ПАНЕЛЬ КЕРУВАННЯ ПАРСЕРОМ
+    # ==========================================
+    STORES_TO_SCRAPE = [
+        "auchan",
+        "novus",
+        "megamarket",
+        "ekomarket",
+        "torba",
+        "ultramarket",
+        "metro",
+        "varus",
+        "silpo",
+        "fora"
+    ]
 
+    try:
+        for store in STORES_TO_SCRAPE:
+            process_store(store, router)
+
+    except KeyboardInterrupt:
+        print("\n🛑 Процес перервано користувачем (Ctrl+C).")
     finally:
         print("\n🔒 Закриття з'єднання з базою даних...")
-        router.close()
+        # Припускаю, що в роутері є метод закриття або ми закриваємо сесію репозиторію
+        if hasattr(router, 'close'):
+            router.close()
+        print("✅ Роботу системи безпечно завершено.")
