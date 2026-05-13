@@ -12,7 +12,7 @@ class ZakazAdapter(BaseAdapter):
     def normalize(self, raw_data: Dict[str, Any], media_proxy: Any = None) -> Optional[Dict[str, Any]]:
         if not raw_data or not isinstance(raw_data, dict): return None
 
-        original_sku = str(raw_data.get("sku") or "")
+        original_sku = str(raw_data.get("ean") or raw_data.get("sku") or "")
         if not original_sku: return None
 
         # Динамічний SKU: auchan_123456 або novus_123456
