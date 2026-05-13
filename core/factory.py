@@ -5,6 +5,8 @@ from scrapers.fora.scraper import ForaScraper
 from scrapers.fora.adapter import ForaAdapter
 from scrapers.varus.scraper import VarusScraper
 from scrapers.varus.adapter import VarusAdapter
+from scrapers.novus.scraper import NovusScraper
+from scrapers.novus.adapter import NovusAdapter
 from core.media_proxy import CloudinaryImageProxy
 
 
@@ -40,6 +42,8 @@ class ParserFactory:
                 Currently supported values are:
                 - `"silpo"`
                 - `"fora"`
+                - `"varus"`
+                - `"novus"`
 
         Returns:
             Any: An instantiated store scraper object (e.g., `SilpoScraper` or `ForaScraper`).
@@ -67,5 +71,7 @@ class ParserFactory:
             return ForaScraper(ForaAdapter(), media_proxy)
         elif store_name == "varus":
             return VarusScraper(VarusAdapter(), media_proxy)
+        elif store_name == "novus":
+            return NovusScraper(NovusAdapter(), media_proxy)
         else:
             raise ValueError(f"Магазин {store_name} не підтримується")
