@@ -53,16 +53,15 @@ class TestParserFactory:
             ParserFactory.create_scraper("atb")
 
         # Check both the occurrence of the error and the specific message content
-        assert "Магазин atb не підтримується" in str(exc_info.value)
+        assert "Магазин 'atb' не підтримується" in str(exc_info.value)
 
-    def test_factory_is_case_sensitive(self):
+    def test_factory_is_case_insensitive(self):
         """
-        Verify that the factory is case-sensitive regarding store identifiers.
+        Verify that the factory is case-insensitive regarding store identifiers.
 
-        This test prevents bugs caused by incorrect naming conventions, ensuring
-        that only lowercase identifiers are accepted as valid inputs.
+        This test ensures that the factory correctly processes names regardless
+        of capitalization (e.g., "Silpo" or "SILPO" should work just like "silpo").
         """
-        with pytest.raises(ValueError) as exc_info:
-            ParserFactory.create_scraper("SILPO")  # Must be written in lowercase only
+        scraper = ParserFactory.create_scraper("SILPO")
 
-        assert "Магазин SILPO не підтримується" in str(exc_info.value)
+        assert scraper.__class__.__name__ == "SilpoScraper"
