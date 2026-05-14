@@ -9,7 +9,8 @@ from scrapers.zakaz.scraper import ZakazScraper
 from scrapers.zakaz.adapter import ZakazAdapter
 from scrapers.zakaz.api_client import ZakazApiClient
 from core.media_proxy import CloudinaryImageProxy
-
+from scrapers.atb.scraper import AtbScraper
+from scrapers.atb.adapter import AtbAdapter
 from config import ZAKAZ_STORES
 
 
@@ -76,6 +77,8 @@ class ParserFactory:
             return ForaScraper(ForaAdapter(), media_proxy)
         elif store_name == "varus":
             return VarusScraper(VarusAdapter(), media_proxy)
+        elif store_name == "atb":
+            return AtbScraper(AtbAdapter(), media_proxy)
 
         # Універсальний парсер для екосистеми Zakaz.ua (Novus, Auchan, Megamarket...)
         elif store_name in ZAKAZ_STORES:

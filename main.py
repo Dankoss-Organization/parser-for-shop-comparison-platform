@@ -58,6 +58,7 @@ if __name__ == "__main__":
         "varus",
         "silpo",
         "fora"
+        "atb"
     ]
 
     try:
