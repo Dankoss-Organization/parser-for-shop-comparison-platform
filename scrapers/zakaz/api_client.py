@@ -61,7 +61,7 @@ class ZakazApiClient:
 
                     start_count = len(slugs)
                     for item in results:
-                        product_id = item.get("sku")
+                        product_id = item.get("ean") or item.get("sku")
                         if product_id: slugs.add(str(product_id))
 
                     if len(slugs) == start_count: break  # Захист від зациклення
