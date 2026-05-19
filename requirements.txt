@@ -5,3 +5,5 @@ python-dotenv
 pdoc
 cloudinary
 sentence-transformers
+beautifulsoup4
+cloudscraper
