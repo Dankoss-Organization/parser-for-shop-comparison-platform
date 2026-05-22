@@ -79,18 +79,15 @@ class AtbAdapter(BaseAdapter):
         if img_url and not img_url.startswith('http'):
             img_url = f"https://www.atbmarket.com{img_url}"
 
-        raw_gallery_urls = [img_url] if img_url else []
-        new_gallery = []
-        if raw_gallery_urls and media_proxy:
-            new_img = media_proxy.process_image(
+        cloud_main_image_url = None
+        if img_url and media_proxy:
+            cloud_main_image_url = media_proxy.process_image(
                 raw_url=img_url,
                 product_sku=product_sku,
                 suffix="main",
                 headers={},
                 folder_name="atb_products"
             )
-            if new_img:
-                new_gallery.append(new_img)
 
         # Перевірка на Національний Кешбек
         is_national_cashback = bool(soup.find('span', string=re.compile(r'Національний Кешбек', re.I)))
@@ -109,9 +106,9 @@ class AtbAdapter(BaseAdapter):
             "country": "Україна",
             "media": {
                 "raw_main_image": img_url,
-                "raw_gallery": raw_gallery_urls,
-                "main_image": new_gallery[0] if new_gallery else None,
-                "gallery": new_gallery
+                "raw_gallery": [],
+                "main_image": cloud_main_image_url,
+                "gallery": []
             },
             "measurements": measurements,
             "pricing_logic": {"sales_unit": "piece", "unit_step": 1},
