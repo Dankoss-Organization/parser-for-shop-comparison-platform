@@ -1,3 +1,5 @@
+import time
+import random
 import requests
 from typing import List, Dict, Any
 from config import SILPO_HEADERS
@@ -52,22 +54,23 @@ class SilpoApiClient:
         limit = 50
         categories = [
             "frukty-ovochi-4788",
-            "molochni-produkty-ta-iaitsia-3913",
-            "khlib-ta-khlibobulochni-vyroby-4061",
-            "syry-3882",
-            "miaso-4296",
-            "ryba-ta-moreprodukty-3306",
-            "kulinariia-829",
-            "solodoshchi-ta-torti-3841",
-            "napoi-8195",
-            "alkohol-5423",
-            "zamorozheni-produkty-4444",
-            "bakaliia-ta-konservy-4330",
-            "dytiache-kharchuvannia-7171",
-            "krasa-ta-dohliad-4876",
-            "tovary-dlia-tvaryn-5800",
-            "pobutova-khimiia-5095",
-            "dlia-kykhni-ta-domu-6691"
+            "m-iaso-4411",
+            "ryba-4430",
+            "kovbasni-vyroby-i-m-iasni-delikatesy-4731",
+            "syry-1468",
+            "khlib-ta-vypichka-5121",
+            "gotovi-stravy-i-kulinariia-4761",
+            "molochni-produkty-ta-iaitsia-234",
+            "bady-5222",
+            "bakaliia-i-konservy-4870",
+            "sousy-i-spetsii-4938",
+            "solodoshchi-498",
+            "sneky-ta-chypsy-5016",
+            "kava-chai-359",
+            "napoi-52",
+            "zamorozhena-produktsiia-264",
+            "alkogol-22",
+            "sygarety-stiky-zhuiky-4384"
         ]
 
         print("🔍 [СІЛЬПО] Починаємо збір загального списку товарів (Discovery Phase)...")
@@ -98,9 +101,17 @@ class SilpoApiClient:
                         if 'slug' in item:
                             all_slugs.append(item['slug'])
 
+                    print(f"      📥 Зібрано {len(items)} товарів зі сторінки {page}...")
+
+                    time.sleep(random.uniform(0.5, 1.5))
+
                 except requests.exceptions.RequestException as e:
                     print(f"⚠️ Помилка на сторінці {page} (категорія {category}): {e}")
+                    time.sleep(5)
                     break
+
+            print("   ⏳ Робимо паузу перед наступною категорією для безпеки...")
+            time.sleep(random.uniform(2.0, 4.0))
 
         unique_slugs = list(set(all_slugs))
         print(f"   ✅ Загалом зібрано {len(unique_slugs)} унікальних товарів.")
