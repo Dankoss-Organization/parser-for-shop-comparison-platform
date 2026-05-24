@@ -1,5 +1,6 @@
 import requests
 import time
+import random
 from typing import Dict, Any, List
 from config import FORA_HEADERS
 
@@ -54,99 +55,140 @@ class ForaApiClient:
             raise Exception(f"Відмова API Фори: {e}")
 
     @staticmethod
-    def fetch_all_slugs(filial_id: int = 310, max_pages: int = 2) -> List[str]:
-        """
-        Discovers and compiles a list of available product slugs from the store catalog.
+    def debug_category(cat_slug: str, filial_id: int = 310):
+        """Перевіряє перші 3 товари з категорії — їх slug та назву"""
+        url = 'https://api.catalog.ecom.fora.ua/api/2.0/exec/EcomCatalogGlobal'
+        headers = FORA_HEADERS.copy()
 
-        This method acts as the discovery phase for the scraper. It performs a multi-step
-        API communication process:
-        1. Fetches the high-level category tree using the 'GetCategories' method.
-        2. Iterates through a limited subset of top-level categories.
-        3. Paginates through each category using the 'GetSimpleCatalogItems' method to
-           extract individual product slugs.
+        # Витягуємо ID категорії (все, що після останнього дефіса)
+        cat_id = int(cat_slug.split('-')[-1])
 
-        Note:
-            To prevent excessive API load and rate-limiting, the method includes a small
-            sleep interval (0.1s) between pagination requests and uses a `set` to guarantee
-            uniqueness of the collected identifiers.
+        payload = {
+            "method": "GetSimpleCatalogItems",
+            "data": {
+                "merchantId": 2,
+                "deliveryType": 2,
+                "filialId": filial_id,
+                "categoryId": cat_id,  # 👈 ТЕПЕР ПЕРЕДАЄМО ID КАТЕГОРІЇ
+                "From": 1,
+                "To": 5,
+                "businessId": 1
+            }
+        }
 
-        Args:
-            filial_id (int, optional): The branch ID to check for available catalog items.
-                Defaults to 310.
-            max_pages (int, optional): The maximum number of pagination steps to perform
-                per category. Prevents infinite loops and limits the extraction scope.
-                Defaults to 2.
+        response = requests.post(url, headers=headers, json=payload, timeout=10)
+        data = response.json()
+        items = data.get('items', [])
 
-        Returns:
-            List[str]: A unique list of string slugs representing discovered products
-            ready for detailed extraction.
-        """
+        print(f"\n=== {cat_slug} (ID: {cat_id}) ===")
+        for item in items:
+            print(f"  slug: {item.get('slug')}")
+            print(f"  name: {item.get('name') or item.get('title')}")
+            print()
+
+    @staticmethod
+    def fetch_all_slugs(filial_id: int = 310, max_pages: int = 200) -> List[str]:
         url = 'https://api.catalog.ecom.fora.ua/api/2.0/exec/EcomCatalogGlobal'
         headers = FORA_HEADERS.copy()
         all_slugs = set()
+        step = 50
+        max_empty_pages = 3  # скільки сторінок без нових товарів перед виходом
 
-        try:
-            cat_payload = {
-                "method": "GetCategories",
-                "data": {"deliveryType": 2, "filialId": filial_id, "merchantId": 2}
-            }
-            cat_resp = requests.post(url, headers=headers, json=cat_payload, timeout=10)
-            cat_resp.raise_for_status()
-            categories_tree = cat_resp.json().get('tree', [])
-            category_slugs = [c.get('slug') for c in categories_tree if c.get('slug')]
-        except Exception as e:
-            print(f" Помилка завантаження категорій для Discovery: {e}")
-            return []
+        # Тепер debug покаже правильні товари!
+        ForaApiClient.debug_category("pitsa-ta-kulinariia-3268")
+        ForaApiClient.debug_category("frukty-ovochi-ta-solinnia-2790")
 
-        # Limit to the first 3 categories for scope control during discovery
-        category_slugs = category_slugs[:3]
+        categories = [
+            "pitsa-ta-kulinariia-3268",
+            "frukty-ovochi-ta-solinnia-2790",
+            "molochni-produkty-ta-iaitsia-2656",
+            "bakaliia-konservy-ta-sousy-2492",
+            "kovbasy-ta-m-iasni-delikatesy-2738",
+            "khlib-ta-khlibobulochni-vyroby-2902",
+            "vlasna-vypichka-5358",
+            "svizhe-m-iaso-5401",
+            "ryba-2699",
+            "syry-5392",
+            "solodoshchi-2913",
+            "mineralna-i-pytna-voda-3642",
+            "soky-ta-napoi-2479",
+            "alkogol-2451",
+            "sneky-2730",
+            "sygarety-stiky-zhuiky-2886",
+            "kava-chai-2775",
+            "zamorozhena-produktsiia-2686"
+        ]
 
-        for cat_slug in category_slugs:
-            print(f"   Категорія: {cat_slug}")
-            step = 30
+        print(f"🔍 [ФОРА] Починаємо парсинг {len(categories)} вибраних категорій...")
+
+        for i, cat_slug in enumerate(categories):
+            print(f"\n   📂 [{i + 1}/{len(categories)}] {cat_slug}")
+
+            # Витягуємо числовий ID категорії зі слага
+            try:
+                cat_id = int(cat_slug.split('-')[-1])
+            except ValueError:
+                print(f"   ⚠️ Не вдалося витягти ID з {cat_slug}, пропускаємо...")
+                continue
+
+            slugs_before = len(all_slugs)
+            empty_streak = 0
 
             for page in range(max_pages):
-                from_item = page * step + 1
-                to_item = (page + 1) * step
-
                 payload = {
                     "method": "GetSimpleCatalogItems",
                     "data": {
                         "merchantId": 2,
                         "deliveryType": 2,
                         "filialId": filial_id,
-                        "slug": cat_slug,
-                        "From": from_item,
-                        "To": to_item,
+                        "categoryId": cat_id,  # 👈 МАГІЯ ТУТ: Фільтруємо за числовим ID
+                        "From": page * step + 1,
+                        "To": (page + 1) * step,
                         "businessId": 1
                     }
                 }
 
                 try:
+                    start = time.time()
                     response = requests.post(url, headers=headers, json=payload, timeout=10)
                     response.raise_for_status()
+                    elapsed = time.time() - start
+
                     data = response.json()
-
                     items = data.get('items', [])
+
                     if not items:
-                        # Break pagination if no more items are returned
+                        print(f"   📄 Стор. {page + 1}: порожньо — кінець категорії")
                         break
 
+                    before = len(all_slugs)
                     for item in items:
-                        slug = item.get('slug')
-                        if slug:
-                            all_slugs.add(slug)
+                        if item.get('slug'):
+                            all_slugs.add(item['slug'])
+                    truly_new = len(all_slugs) - before
 
-                    items_count = data.get('itemsCount', 0)
-                    if to_item >= items_count:
-                        # Break pagination if we have reached the total items count
+                    print(
+                        f"   📄 Стор. {page + 1}: +{truly_new} нових / {len(items)} отримано | Всього: {len(all_slugs)} | ⏱ {elapsed:.1f}с")
+
+                    if truly_new == 0:
+                        empty_streak += 1
+                        if empty_streak >= max_empty_pages:
+                            print(f"   ⏭ {max_empty_pages} сторінки поспіль без нових товарів — пропускаємо категорію")
+                            break
+                    else:
+                        empty_streak = 0
+
+                    if len(items) < step:
                         break
 
-                    # Small delay to prevent rate-limiting by the API
                     time.sleep(0.1)
 
                 except Exception as e:
-                    print(f"️ Помилка на категорії {cat_slug} (стор. {page + 1}): {e}")
+                    print(f"\n   ⚠️ Помилка стор. {page + 1}: {e}")
                     break
 
+            new_slugs = len(all_slugs) - slugs_before
+            print(f"   ✅ Готово. Нових у цій категорії: {new_slugs} | Всього унікальних: {len(all_slugs)}")
+
+        print(f"\n✅ Парсинг завершено. Зібрано {len(all_slugs)} унікальних товарів.")
         return list(all_slugs)

@@ -86,7 +86,7 @@ class ZakazAdapter(BaseAdapter):
             },
             "offers": [{
                 "store_id": f"z_{self.chain_name}",
-                "store_name": self.display_name,  
+                "store_name": self.display_name,
                 "url": raw_data.get("web_url") or "",
                 "is_in_stock": bool(raw_data.get("in_stock", False)),
                 "sku": original_sku,
