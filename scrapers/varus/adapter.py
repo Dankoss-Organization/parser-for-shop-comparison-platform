@@ -103,9 +103,9 @@ class VarusAdapter(BaseAdapter):
             "country": country_name,
             "media": {
                 "raw_main_image": raw_main_image_url,
-                "raw_gallery": [raw_main_image_url],
+                "raw_gallery": [],
                 "main_image": new_image,
-                "gallery": [new_image] if new_image else []
+                "gallery": []
             },
             "measurements": measurements,
             "pricing_logic": {"sales_unit": "piece", "unit_step": 1},

@@ -1,3 +1,5 @@
+import time
+import random
 import requests
 from typing import List, Dict, Any
 from config import SILPO_HEADERS
@@ -50,41 +52,70 @@ class SilpoApiClient:
 
         all_slugs = []
         limit = 50
+        categories = [
+            "frukty-ovochi-4788",
+            "m-iaso-4411",
+            "ryba-4430",
+            "kovbasni-vyroby-i-m-iasni-delikatesy-4731",
+            "syry-1468",
+            "khlib-ta-vypichka-5121",
+            "gotovi-stravy-i-kulinariia-4761",
+            "molochni-produkty-ta-iaitsia-234",
+            "bady-5222",
+            "bakaliia-i-konservy-4870",
+            "sousy-i-spetsii-4938",
+            "solodoshchi-498",
+            "sneky-ta-chypsy-5016",
+            "kava-chai-359",
+            "napoi-52",
+            "zamorozhena-produktsiia-264",
+            "alkogol-22",
+            "sygarety-stiky-zhuiky-4384"
+        ]
 
         print("🔍 [СІЛЬПО] Починаємо збір загального списку товарів (Discovery Phase)...")
 
-        for page in range(1, max_pages + 1):
-            # Query parameters exactly matching the store's web client behavior
-            params = {
-                "limit": limit,
-                "offset": (page - 1) * limit,
-                "deliveryType": "DeliveryHome",
-                "category": "frukty-ovochi-4788",
-                "includeChildCategories": "true",
-                "inStock": "true"
-            }
+        for category in categories:
+            print(f"   📂 Скануємо категорію: {category}...")
+            for page in range(1, max_pages + 1):
+                params = {
+                    "limit": limit,
+                    "offset": (page - 1) * limit,
+                    "deliveryType": "DeliveryHome",
+                    "category": category,
+                    "includeChildCategories": "true",
+                    "inStock": "true"
+                }
 
-            try:
-                response = requests.get(url, headers=headers, params=params, timeout=10)
-                response.raise_for_status()
-                data = response.json()
+                try:
+                    response = requests.get(url, headers=headers, params=params, timeout=10)
+                    response.raise_for_status()
+                    data = response.json()
 
-                items = data.get('items', [])
-                if not items:
-                    print(f"   ℹ️ Товари закінчилися на сторінці {page}.")
+                    items = data.get('items', [])
+                    if not items:
+                        print(f"      ℹ️ Товари закінчилися (категорія {category}, сторінка {page}).")
+                        break
+
+                    for item in items:
+                        if 'slug' in item:
+                            all_slugs.append(item['slug'])
+
+                    print(f"      📥 Зібрано {len(items)} товарів зі сторінки {page}...")
+
+                    time.sleep(random.uniform(0.5, 1.5))
+
+                except requests.exceptions.RequestException as e:
+                    print(f"⚠️ Помилка на сторінці {page} (категорія {category}): {e}")
+                    time.sleep(5)
                     break
 
-                for item in items:
-                    if 'slug' in item:
-                        all_slugs.append(item['slug'])
+            print("   ⏳ Робимо паузу перед наступною категорією для безпеки...")
+            time.sleep(random.uniform(2.0, 4.0))
 
-                print(f"   📥 Зібрано {len(all_slugs)} товарів (Сторінка {page})...")
-
-            except requests.exceptions.RequestException as e:
-                print(f"⚠️ Помилка при зборі списку (сторінка {page}): {e}")
-                break
-
-        return list(set(all_slugs))
+        unique_slugs = list(set(all_slugs))
+        print(f"   ✅ Загалом зібрано {len(unique_slugs)} унікальних товарів.")
+        return unique_slugs
 
     @staticmethod
     def fetch_detailed_product(slug: str, branch_id: str = "1edee42f-ece6-6e12-8d91-d3a7e392bfd1") -> Dict[str, Any]:

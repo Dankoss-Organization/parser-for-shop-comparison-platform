@@ -87,23 +87,18 @@ class ForaAdapter(BaseAdapter):
 
         raw_main_image_url = raw_data.get('mainImage')
 
-        raw_gallery_urls = [img.get('path') for img in (raw_data.get('images') or []) if img.get('path')]
+        if not raw_main_image_url and raw_data.get('images'):
+            raw_main_image_url = raw_data['images'][0].get('path')
 
-        if not raw_gallery_urls and raw_main_image_url:
-            raw_gallery_urls = [raw_main_image_url]
-
-        new_gallery = []
-        for idx, raw_img_url in enumerate(raw_gallery_urls):
-            suffix = "main" if idx == 0 else f"gallery_{idx}"
-            new_gallery_img = media_proxy.process_image(
-                raw_url=raw_img_url,
+        cloud_main_image_url = None
+        if raw_main_image_url:
+            cloud_main_image_url = media_proxy.process_image(
+                raw_url=raw_main_image_url,
                 product_sku=product_sku,
-                suffix=suffix,
+                suffix="main",
                 headers=FORA_HEADERS,
                 folder_name="fora_products"
             )
-            if new_gallery_img:
-                new_gallery.append(new_gallery_img)
 
         return {
             "product_id": product_sku,
@@ -113,9 +108,9 @@ class ForaAdapter(BaseAdapter):
             "country": attributes['country'],
             "media": {
                 "raw_main_image": raw_main_image_url,
-                "raw_gallery": raw_gallery_urls,
-                "main_image": new_gallery[0] if new_gallery else None,
-                "gallery": new_gallery
+                "raw_gallery": [],
+                "main_image": cloud_main_image_url,
+                "gallery": []
             },
             "measurements": self.parse_measurements(raw_data.get('unit')),
             "pricing_logic": {

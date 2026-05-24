@@ -86,22 +86,22 @@ class SilpoAdapter(BaseAdapter):
                 bulk_discounts.append({"discount_type": "nth_item_discount", "min_quantity": sp.get('count'), "price_for_nth_item": sp.get('price'), "description": f"Кожна {sp.get('count')}-тя одиниця за {sp.get('price')} грн"})
 
         raw_images = raw_data.get('media', [])
-        raw_gallery_urls = [f"{SILPO_BASE_IMG_URL}{img}" for img in raw_images]
-        raw_main_image_url = raw_gallery_urls[0] if raw_gallery_urls else None
-
-        new_gallery = []
-        for idx, raw_img_url in enumerate(raw_gallery_urls):
-            suffix = "main" if idx == 0 else f"gallery_{idx}"
-            new_gallery_img = media_proxy.process_image(
-                raw_url=raw_img_url, product_sku=product_sku, suffix=suffix,
-                headers=SILPO_HEADERS, folder_name="silpo_products", fallback_replace=("1000x1000/webp/", "")
+        raw_main_image_url = f"{SILPO_BASE_IMG_URL}{raw_images[0]}" if raw_images else None
+        cloud_main_image_url = None
+        if raw_main_image_url:
+            cloud_main_image_url = media_proxy.process_image(
+                raw_url=raw_main_image_url,
+                product_sku=product_sku,
+                suffix="main",
+                headers=SILPO_HEADERS,
+                folder_name="silpo_products",
+                fallback_replace=("1000x1000/webp/", "")
             )
-            if new_gallery_img: new_gallery.append(new_gallery_img)
 
         return {
             "product_id": product_sku, "canonical_name": raw_data.get('title'), "brand": attributes['brand'],
             "category": category_path, "country": attributes['country'],
-            "media": {"raw_main_image": raw_main_image_url, "raw_gallery": raw_gallery_urls, "main_image": new_gallery[0] if new_gallery else None, "gallery": new_gallery},
+            "media": {"raw_main_image": raw_main_image_url, "raw_gallery": [], "main_image": cloud_main_image_url, "gallery": []},
             "measurements": self.parse_measurements(raw_data.get('displayRatio')),
             "pricing_logic": {"sales_unit": "piece" if raw_data.get('ratio') == "шт" else "weight", "unit_step": raw_data.get('addToBasketStep', 1)},
             "specific_attributes": {

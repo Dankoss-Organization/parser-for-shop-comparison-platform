@@ -73,9 +73,9 @@ class ZakazAdapter(BaseAdapter):
             "country": raw_data.get("country") or "Не вказано",
             "media": {
                 "raw_main_image": raw_main_image_url,
-                "raw_gallery": [raw_main_image_url] if raw_main_image_url else [],
+                "raw_gallery": [],
                 "main_image": new_image,
-                "gallery": [new_image] if new_image else []
+                "gallery": []
             },
             "measurements": measurements,
             "pricing_logic": {"sales_unit": "piece", "unit_step": 1},
@@ -85,8 +85,8 @@ class ZakazAdapter(BaseAdapter):
                 "description": clean_description
             },
             "offers": [{
-                "store_id": f"z_{self.chain_name}",  # z_auchan або z_novus
-                "store_name": self.display_name,  # Auchan або Novus
+                "store_id": f"z_{self.chain_name}",
+                "store_name": self.display_name,
                 "url": raw_data.get("web_url") or "",
                 "is_in_stock": bool(raw_data.get("in_stock", False)),
                 "sku": original_sku,
