@@ -1,3 +1,5 @@
+import os
+import json
 from typing import List, Dict, Any, Optional
 from core.base_scraper import BaseScraper
 from .api_client import SilpoApiClient
@@ -11,6 +13,7 @@ class SilpoScraper(BaseScraper):
     It orchestrates the scraping workflow by coordinating between the
     discovery logic and the detailed data extraction phase.
     """
+    CACHE_FILE = "cache/silpo_slugs.json"
 
     def discover_slugs(self) -> List[str]:
         """
@@ -25,7 +28,24 @@ class SilpoScraper(BaseScraper):
             List[str]: A list of unique string identifiers (slugs) found during
             the discovery process.
         """
-        return SilpoApiClient.fetch_all_slugs(max_pages=2)
+        if os.path.exists(self.CACHE_FILE):
+            print(f"📦 [СІЛЬПО] Знайдено локальний кеш! Завантажуємо слаги з {self.CACHE_FILE}...")
+            with open(self.CACHE_FILE, "r", encoding="utf-8") as f:
+                slugs = json.load(f)
+                print(f"   ✅ Завантажено {len(slugs)} товарів з кешу.")
+                return slugs
+
+            # 2. Якщо кешу немає, робимо реальний запит до API (ставимо 9999 щоб зібрати ВСЕ)
+        print("🔍 [СІЛЬПО] Кеш не знайдено. Починаємо збір з API (Discovery Phase)...")
+        slugs = SilpoApiClient.fetch_all_slugs(max_pages=9999)
+
+        # 3. Створюємо папку cache (якщо її ще немає) і записуємо результати у файл
+        os.makedirs(os.path.dirname(self.CACHE_FILE), exist_ok=True)
+        with open(self.CACHE_FILE, "w", encoding="utf-8") as f:
+            json.dump(slugs, f, ensure_ascii=False, indent=2)
+
+        print(f"💾 [СІЛЬПО] Успішно збережено {len(slugs)} товарів у {self.CACHE_FILE}")
+        return slugs
 
     def fetch_data(self, slug: str) -> Optional[Dict[str, Any]]:
         """

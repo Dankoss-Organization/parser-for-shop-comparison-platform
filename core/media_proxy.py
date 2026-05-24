@@ -40,6 +40,8 @@ class CloudinaryImageProxy:
             )
             CloudinaryImageProxy._initialized = True
 
+        os.makedirs(STORAGE_DIR, exist_ok=True)
+
     def process_image(
             self,
             raw_url: str,
@@ -129,4 +131,5 @@ class CloudinaryImageProxy:
             return upload_result.get("secure_url")
 
         except Exception as e:
-            raise Exception(f"Збій при завантаженні фото ({raw_url}): {e}")
+            print(f"    ⚠️ [УВАГА] Збій при завантаженні фото ({raw_url}): {e}")
+            return raw_url
