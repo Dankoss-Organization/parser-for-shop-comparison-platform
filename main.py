@@ -51,14 +51,14 @@ if __name__ == "__main__":
         "fora",
         "silpo",
         "atb",
-        "auchan",
+        "varus",
         "novus",
         "megamarket",
         "ekomarket",
         "torba",
         "ultramarket",
         "metro",
-        "varus"
+        "auchan"
     ]
 
     try:

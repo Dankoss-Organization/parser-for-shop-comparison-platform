@@ -1,7 +1,7 @@
 import uuid
 from sqlalchemy.orm import Session
 from sqlalchemy import cast, Float
-from .models import Product, Offer
+from .models import Product, Offer, Category
 
 
 class Repository:
@@ -139,12 +139,16 @@ class Repository:
             new_id = str(uuid.uuid4())
             spec_attr = unified_item.get('specific_attributes', {})
 
+            cat_id = self.get_or_create_category_tree(unified_item.get('category'))
+
             product = Product(
                 id=new_id,
                 productId=unified_item.get('product_id'),
                 canonical_name=unified_item.get('canonical_name'),
                 brand=unified_item.get('brand'),
                 country=unified_item.get('country'),
+
+                category_id=cat_id,
 
                 media=unified_item.get('media'),
                 measurements=unified_item.get('measurements'),
@@ -168,8 +172,40 @@ class Repository:
             self.db.commit()
             return new_id
         except Exception as e:
-            self.db.rollback()  # Відкочуємо транзакцію при збої
+            self.db.rollback()
             raise e
+
+    def get_or_create_category_tree(self, category_string: str) -> int | None:
+        """
+        Розбиває рядок категорії з парсера, створює дерево в БД (якщо його ще немає)
+        і повертає ID кінцевої підкатегорії.
+        """
+        if not category_string:
+            return None
+
+        categories = [cat.strip() for cat in category_string.split('>')]
+
+        parent_id = None
+        last_cat_id = None
+
+        for cat_name in categories:
+            existing_category = self.db.query(Category).filter_by(
+                name=cat_name,
+                parent_id=parent_id
+            ).first()
+
+            if existing_category:
+                parent_id = existing_category.id
+                last_cat_id = existing_category.id
+            else:
+                new_category = Category(name=cat_name, parent_id=parent_id)
+                self.db.add(new_category)
+                self.db.flush()
+
+                parent_id = new_category.id
+                last_cat_id = new_category.id
+
+        return last_cat_id
 
     def create_offer(self, product_id: str, offer_data: dict, store_sku: str):
         """

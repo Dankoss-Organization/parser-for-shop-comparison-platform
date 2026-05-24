@@ -13,6 +13,19 @@ from datetime import datetime, timezone
 
 Base = declarative_base()
 
+class Category(Base):
+    __tablename__ = 'pr_categories'  # Твоя таблиця
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    parent_id = Column(Integer, ForeignKey('pr_categories.id'), nullable=True)
+
+    # Relationship для отримання підкатегорій (опціонально, але корисно)
+    subcategories = relationship("Category")
+
+    # Relationship до товарів
+    products = relationship("Product", back_populates="category", foreign_keys="[Product.category_id]")
+
 
 class Product(Base):
     """
@@ -43,6 +56,8 @@ class Product(Base):
     canonical_name = Column(String)
     brand = Column(String, index=True)
     country = Column(String)
+    category_id = Column(Integer, ForeignKey('pr_categories.id'), nullable=True)
+    category = relationship("Category", back_populates="products")
 
     # JSON fields for flexible schemaless data
     media = Column(JSONB)
