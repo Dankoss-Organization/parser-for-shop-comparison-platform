@@ -48,9 +48,9 @@ if __name__ == "__main__":
     # ПАНЕЛЬ КЕРУВАННЯ ПАРСЕРОМ
     # ==========================================
     STORES_TO_SCRAPE = [
-        "fora",
-        "silpo",
         "atb",
+        "silpo",
+        "fora",
         "varus",
         "novus",
         "megamarket",

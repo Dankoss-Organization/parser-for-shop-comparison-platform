@@ -10,20 +10,19 @@ from sqlalchemy import Column, String, Float, Boolean, DateTime, ForeignKey, Int
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship, declarative_base
 from datetime import datetime, timezone
+import uuid
 
 Base = declarative_base()
 
 class Category(Base):
     __tablename__ = 'pr_categories'  # Твоя таблиця
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     name = Column(String, nullable=False)
-    parent_id = Column(Integer, ForeignKey('pr_categories.id'), nullable=True)
+    parent_id = Column(String, ForeignKey('pr_categories.id'), nullable=True)
 
     # Relationship для отримання підкатегорій (опціонально, але корисно)
     subcategories = relationship("Category")
-
-    # Relationship до товарів
     products = relationship("Product", back_populates="category", foreign_keys="[Product.category_id]")
 
 
@@ -56,7 +55,7 @@ class Product(Base):
     canonical_name = Column(String)
     brand = Column(String, index=True)
     country = Column(String)
-    category_id = Column(Integer, ForeignKey('pr_categories.id'), nullable=True)
+    category_id = Column(String, ForeignKey('pr_categories.id'), nullable=True)
     category = relationship("Category", back_populates="products")
 
     # JSON fields for flexible schemaless data
@@ -83,11 +82,8 @@ class Product(Base):
     updatedAt = Column(DateTime, default=lambda: datetime.now(timezone.utc),
                        onupdate=lambda: datetime.now(timezone.utc))
 
-    category_id = Column(String)
-
     # Relationships
     offers = relationship("Offer", back_populates="product")
-    price_history = relationship("PriceHistory", back_populates="product")
 
 
 class Offer(Base):
@@ -124,27 +120,16 @@ class Offer(Base):
 
 
 class PriceHistory(Base):
-    """
-    Records the historical price changes of a product over time.
-
-    This table acts as a time-series ledger, allowing the platform to generate
-    price trend charts and track inflation or discount honesty.
-
-    Attributes:
-        id (Integer): An auto-incrementing primary key.
-        product_id (String): A foreign key linking to the global product.
-        price (Float): The recorded price at the specific point in time.
-        scraped_at (DateTime): The exact UTC timestamp when this price was observed.
-    """
     __tablename__ = "price_history"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-
-    # Note: Ensure that the ForeignKey references the exact table and column names
-    product_id = Column(String, ForeignKey("product.id"), nullable=False)
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    offer_id = Column(String, ForeignKey("offers.id"), nullable=False)
 
     price = Column(Float, nullable=False)
-    scraped_at = Column(DateTime, nullable=False)
+    regular_price = Column(Float, nullable=False)
 
-    # Relationships
-    product = relationship("Product", back_populates="price_history")
+    # Інтервали дії ціни
+    start_date = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    end_date = Column(DateTime, nullable=True)  # Поки ціна актуальна, це поле пусте
+
+    offer = relationship("Offer", backref="price_history")
