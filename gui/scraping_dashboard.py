@@ -30,6 +30,7 @@ from tkinter import ttk, scrolledtext, messagebox
 import threading
 from typing import Dict, Optional
 from datetime import datetime
+import queue
 
 from core.parallel_engine import ParallelScrapingEngine, ProgressEvent, ScrapeStats
 
@@ -164,6 +165,9 @@ class ScrapingDashboard:
         self.root.geometry("1100x750")
         self.root.minsize(900, 600)
 
+        self._gui_queue = queue.Queue()
+        self.root.after(50, self._poll_gui_queue)
+
         self._engine: Optional[ParallelScrapingEngine] = None
         self._engine_thread: Optional[threading.Thread] = None
         self._store_vars: Dict[str, tk.BooleanVar] = {}
@@ -172,6 +176,18 @@ class ScrapingDashboard:
         self._setup_styles()
         self._build_ui()
 
+    def _poll_gui_queue(self):
+        """Runs on the main Tkinter thread. Drains the GUI queue."""
+        try:
+            while True:
+                # Читаємо всі події, які накопичилися
+                event = self._gui_queue.get_nowait()
+                self._apply_event(event)
+        except queue.Empty:
+            pass
+        finally:
+            # Перезапускаємо таймер
+            self.root.after(50, self._poll_gui_queue)
     # ------------------------------------------------------------------
     # UI construction
     # ------------------------------------------------------------------
@@ -411,13 +427,10 @@ class ScrapingDashboard:
 
     def _on_progress_event(self, event: ProgressEvent):
         """
-        Thread-safe callback: schedules all UI mutations on the main event loop.
-
-        Args:
-            event: Progress snapshot from a worker thread.
+        Thread-safe callback: called from worker threads.
+        Only puts data into the thread-safe queue.
         """
-        # Use root.after(0, ...) to safely update Tkinter from a non-main thread.
-        self.root.after(0, lambda e=event: self._apply_event(e))
+        self._gui_queue.put(event)
 
     def _apply_event(self, event: ProgressEvent):
         """Applies a progress event to the GUI (runs on main thread)."""

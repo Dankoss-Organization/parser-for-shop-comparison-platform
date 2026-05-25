@@ -137,7 +137,7 @@ class ParallelScrapingEngine:
         self,
         stores: List[str],
         workers_per_store: int = 4,
-        db_queue_maxsize: int = 200,
+        db_queue_maxsize: int = 0,
         progress_callback: Optional[Callable[[ProgressEvent], None]] = None,
     ) -> None:
         self.stores = stores
@@ -383,14 +383,28 @@ class ParallelScrapingEngine:
             ``Session``) to ensure transaction isolation and avoid session
             contamination between stores.
         """
-        router = EntityRouter()
-        logger.info("DBConsumer started.")
+        try:
+            router = EntityRouter()
+            logger.info("DBConsumer started.")
+        except Exception as exc:
+            logger.error("DBConsumer init failed: %s", exc)
+            while True:
+                try:
+                    item = self._db_queue.get_nowait()
+                    if item is _DB_SENTINEL:
+                        break
+                except queue.Empty:
+                    break
+            return
 
         try:
             while True:
-                item = self._db_queue.get()
+                try:
+                    # timeout=1 дозволяє потоку не "залипати" наглухо
+                    item = self._db_queue.get(timeout=1)
+                except queue.Empty:
+                    continue
 
-                # Sentinel → all producers are done, stop the consumer.
                 if item is _DB_SENTINEL:
                     logger.info("DBConsumer received sentinel — shutting down.")
                     break
@@ -405,7 +419,10 @@ class ParallelScrapingEngine:
                     self._db_queue.task_done()
 
         finally:
-            router.close()
+            try:
+                router.close()
+            except Exception:
+                pass
             logger.info("DBConsumer shut down cleanly.")
 
     # ------------------------------------------------------------------
