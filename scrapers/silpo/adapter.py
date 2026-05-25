@@ -101,14 +101,15 @@ class SilpoAdapter(BaseAdapter):
         return {
             "product_id": product_sku, "canonical_name": raw_data.get('title'), "brand": attributes['brand'],
             "category": category_path, "country": attributes['country'],
-            "media": {"raw_main_image": raw_main_image_url, "raw_gallery": [], "main_image": cloud_main_image_url, "gallery": []},
+            "raw_main_image": raw_main_image_url,
+            "main_image": cloud_main_image_url,
             "measurements": self.parse_measurements(raw_data.get('displayRatio')),
             "pricing_logic": {"sales_unit": "piece" if raw_data.get('ratio') == "шт" else "weight", "unit_step": raw_data.get('addToBasketStep', 1)},
             "specific_attributes": {
                 "calories": attributes['calories'], "proteins_g": attributes['proteins_g'], "fats_g": attributes['fats_g'],
                 "carbohydrates_g": attributes['carbohydrates_g'], "alcohol_percentage": attributes['alcohol_percentage'],
                 "is_tobacco": raw_data.get('isTobacco', False), "is_18_plus": raw_data.get('blurForUnderAged', False),
-                "is_national_cashback_eligible": is_national_cashback, "description": raw_data.get('descriptionRich') or raw_data.get('description')
+                "is_national_cashback_eligible": is_national_cashback, "description": self.strip_html(raw_data.get('descriptionRich') or raw_data.get('description'))
             },
             "offers": [{
                 "store_id": "s_silpo", "store_name": "Сільпо", "url": f"https://silpo.ua/product/{raw_data.get('slug')}",

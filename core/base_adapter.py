@@ -1,5 +1,6 @@
 import re
 from typing import Dict, Any, Union
+from bs4 import BeautifulSoup
 
 
 class BaseAdapter:
@@ -10,6 +11,33 @@ class BaseAdapter:
     JSON data from various supermarket APIs into a standardized internal
     dictionary format used by the Shop Comparison Platform.
     """
+
+    @staticmethod
+    def strip_html(text: str) -> str:
+        """
+        Removes all HTML tags from a string and returns clean plain text.
+
+        Uses BeautifulSoup for robust parsing (handles malformed tags,
+        entities like &amp;, &nbsp; etc.). Falls back gracefully on
+        empty/None input.
+
+        Args:
+            text (str): Raw string potentially containing HTML markup.
+
+        Returns:
+            str: Plain text with all HTML tags removed and whitespace normalized.
+
+        Examples:
+            >>> BaseAdapter.strip_html("<p>Смачний <b>йогурт</b></p>")
+            'Смачний йогурт'
+            >>> BaseAdapter.strip_html("Без тегів")
+            'Без тегів'
+            >>> BaseAdapter.strip_html(None)
+            ''
+        """
+        if not text:
+            return ""
+        return BeautifulSoup(str(text), "html.parser").get_text(separator=" ", strip=True)
 
     @staticmethod
     def parse_measurements(ratio_str: Any) -> Dict[str, Union[float, str]]:
