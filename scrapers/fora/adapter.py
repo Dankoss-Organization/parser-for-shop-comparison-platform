@@ -106,12 +106,8 @@ class ForaAdapter(BaseAdapter):
             "brand": attributes['brand'],
             "category": category_path,
             "country": attributes['country'],
-            "media": {
-                "raw_main_image": raw_main_image_url,
-                "raw_gallery": [],
-                "main_image": cloud_main_image_url,
-                "gallery": []
-            },
+            "raw_main_image": raw_main_image_url,
+            "main_image": cloud_main_image_url,
             "measurements": self.parse_measurements(raw_data.get('unit')),
             "pricing_logic": {
                 "sales_unit": "weight" if raw_data.get('isWeightedProduct') else "piece",

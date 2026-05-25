@@ -49,7 +49,7 @@ class AtbAdapter(BaseAdapter):
                     if 'offers' in data and isinstance(data['offers'], dict):
                         regular_price = float(data['offers'].get('price', 0.0))
                     if 'description' in data:
-                        description = data.get('description', description)
+                        description = self.strip_html(data.get('description', description))
                     if 'brand' in data and isinstance(data['brand'], dict) and brand == "Невідомо":
                         brand = data['brand'].get('name', brand)
             except (json.JSONDecodeError, TypeError, ValueError):

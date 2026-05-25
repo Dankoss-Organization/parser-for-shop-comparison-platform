@@ -35,7 +35,7 @@ class ZakazAdapter(BaseAdapter):
             promo_end_date = ""
 
         brand_name = (raw_data.get("producer") or {}).get("trademark") or "Без бренду"
-        clean_description = re.sub(r'<[^>]+>', '', str(raw_data.get("description") or "")).strip()
+        clean_description = self.strip_html(raw_data.get("description") or "")
 
         # Фото
         images = raw_data.get("img") or {}
@@ -71,12 +71,8 @@ class ZakazAdapter(BaseAdapter):
             "brand": brand_name,
             "category": raw_data.get("category_id") or "Інше",
             "country": raw_data.get("country") or "Не вказано",
-            "media": {
-                "raw_main_image": raw_main_image_url,
-                "raw_gallery": [],
-                "main_image": new_image,
-                "gallery": []
-            },
+            "raw_main_image": raw_main_image_url,
+            "main_image": new_image,
             "measurements": measurements,
             "pricing_logic": {"sales_unit": "piece", "unit_step": 1},
             "specific_attributes": {
