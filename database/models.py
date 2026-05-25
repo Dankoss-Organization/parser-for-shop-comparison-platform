@@ -40,7 +40,6 @@ class Product(Base):
         canonical_name (String): The normalized, human-readable name of the product.
         brand (String): The brand name (indexed for faster searching and filtering).
         country (String): The country of origin.
-        media (JSONB): A flexible dictionary storing raw and processed image URLs.
         measurements (JSONB): Stores parsed weight/volume data (e.g., {'value': 100, 'unit': 'g'}).
         pricing_logic (JSONB): Information on how the item is sold (e.g., per piece or weighted).
         calories (String): Stored as a String because some stores provide ranges or
@@ -55,11 +54,12 @@ class Product(Base):
     canonical_name = Column(String)
     brand = Column(String, index=True)
     country = Column(String)
+    raw_main_image = Column(String)
+    main_image = Column(String)
     category_id = Column(String, ForeignKey('pr_categories.id'), nullable=True)
     category = relationship("Category", back_populates="products")
 
     # JSON fields for flexible schemaless data
-    media = Column(JSONB)
     measurements = Column(JSONB)
     pricing_logic = Column(JSONB)
 
@@ -110,6 +110,7 @@ class Offer(Base):
     store_sku = Column(String, index=True, nullable=True)
 
     current_price = Column(Float)  # Price is strictly numerical for calculations
+    discount_price = Column(Float, nullable=True)
 
     createdAt = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updatedAt = Column(DateTime, default=lambda: datetime.now(timezone.utc),

@@ -64,22 +64,34 @@ class Repository:
         """
         return self.db.query(Offer).filter(Offer.store_sku == store_sku).first()
 
-    def update_offer_price(self, offer_id: str, new_price: float, regular_price: float = None):
+    def update_offer_price(self, offer_id: str, new_price: float, regular_price: float = None,
+                           discount_condition: str = None):
         """
-        Updates the current price of an existing offer AND records it in PriceHistory.
+        Updates the prices and conditions of an existing offer AND records it in PriceHistory.
         """
         try:
             offer = self.db.query(Offer).filter(Offer.id == offer_id).first()
             if offer:
-                offer.current_price = new_price
+                reg_p = regular_price if regular_price is not None else new_price
+
+                # Логіка мапінгу під твою структуру:
+                # Якщо регулярна ціна більша за поточну — у нас є акція
+                if reg_p > new_price:
+                    offer.current_price = reg_p  # Ціна без знижки
+                    offer.discount_price = new_price  # Ціна зі знижкою
+                else:
+                    offer.current_price = new_price
+                    offer.discount_price = None  # Знижки немає
+
+                # Записуємо умову акції (якщо передана з парсера)
+                if hasattr(offer, 'discount_condition'):
+                    offer.discount_condition = discount_condition
 
                 if hasattr(offer, 'updatedAt'):
                     offer.updatedAt = datetime.now(timezone.utc)
 
-                if regular_price is None:
-                    regular_price = new_price
-
-                self._record_price_history(offer.id, new_price, regular_price)
+                # Записуємо актуальні зміни в історію цін
+                self._record_price_history(offer.id, offer.current_price, offer.discount_price or offer.current_price)
 
                 self.db.commit()
             return offer
@@ -125,7 +137,8 @@ class Repository:
                 brand=unified_item.get('brand'),
                 country=unified_item.get('country'),
                 category_id=cat_id,
-                media=unified_item.get('media'),
+                raw_main_image=unified_item.get('raw_main_image'),
+                main_image=unified_item.get('main_image'),
                 measurements=unified_item.get('measurements'),
                 pricing_logic=unified_item.get('pricing_logic'),
                 description=spec_attr.get('description'),
@@ -179,9 +192,29 @@ class Repository:
         return last_cat_id
 
     def create_offer(self, product_id: str, offer_data: dict, store_sku: str):
+        """
+        Creates a new store offer or updates an existing one with full discount support.
+        """
         try:
-            current_price = offer_data['pricing']['current_price']
-            regular_price = offer_data['pricing']['regular_price']
+            # 1. Дістаємо сирі ціни з уніфікованого словника парсера
+            parsed_current = offer_data['pricing']['current_price']
+            parsed_regular = offer_data['pricing']['regular_price']
+
+            # 2. Автоматично витягуємо умову акції з гуртових знижок (bulk_discounts), якщо вони є
+            discount_condition = None
+            bulk_discounts = offer_data['pricing'].get('bulk_discounts', [])
+            if bulk_discounts and isinstance(bulk_discounts, list):
+                # Беремо опис першої гуртової умови (наприклад: "Ціна 44.9 грн при купівлі від 2 шт")
+                discount_condition = bulk_discounts[0].get('description')
+
+            # 3. Розподіляємо ціни під твою логіку:
+            # Якщо регулярна ціна більша за поточну, regular — це база, а current — акція
+            if parsed_regular > parsed_current:
+                base_price = parsed_regular
+                promo_price = parsed_current
+            else:
+                base_price = parsed_current
+                promo_price = None
 
             existing_offer = self.db.query(Offer).filter(
                 Offer.product_id == product_id,
@@ -189,14 +222,19 @@ class Repository:
             ).first()
 
             if existing_offer:
-                existing_offer.current_price = current_price
+                # 4. Оновлюємо існуючий оффер
+                existing_offer.current_price = base_price
+                existing_offer.discount_price = promo_price
                 existing_offer.store_sku = store_sku
+
+                if hasattr(existing_offer, 'discount_condition'):
+                    existing_offer.discount_condition = discount_condition
 
                 if hasattr(existing_offer, 'updatedAt'):
                     existing_offer.updatedAt = datetime.now(timezone.utc)
 
                 offer_id = existing_offer.id
-                print(f"   🔄 Оновлено існуючу пропозицію в магазині (ID: {offer_id})")
+                print(f"   🔄 Оновлено пропозицію та умови акції (ID: {offer_id})")
             else:
                 offer_id = str(uuid.uuid4())
                 offer = Offer(
@@ -204,15 +242,20 @@ class Repository:
                     product_id=product_id,
                     store_sku=store_sku,
                     store_id=offer_data.get('store_id'),
-                    current_price=current_price
+                    current_price=base_price,
+                    discount_price=promo_price
                 )
+
+                if hasattr(offer, 'discount_condition'):
+                    offer.discount_condition = discount_condition
 
                 if hasattr(offer, 'updatedAt'):
                     offer.updatedAt = datetime.now(timezone.utc)
 
                 self.db.add(offer)
 
-            self._record_price_history(offer_id, current_price, regular_price)
+            # 6. Фіксуємо поточний стан ціни в розумну історію змін
+            self._record_price_history(offer_id, base_price, promo_price or base_price)
 
             self.db.commit()
             return offer_id
