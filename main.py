@@ -48,10 +48,17 @@ if __name__ == "__main__":
     # ПАНЕЛЬ КЕРУВАННЯ ПАРСЕРОМ
     # ==========================================
     STORES_TO_SCRAPE = [
+<<<<<<< Updated upstream
         "fora",
         "silpo",
         "atb",
         "auchan",
+=======
+        "varus",
+        "atb",
+        "silpo",
+        "fora",
+>>>>>>> Stashed changes
         "novus",
         "megamarket",
         "ekomarket",
