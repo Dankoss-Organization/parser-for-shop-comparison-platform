@@ -49,16 +49,14 @@ if __name__ == "__main__":
     # ==========================================
     STORES_TO_SCRAPE = [
         "atb",
-        "silpo",
-        "fora",
+        "auchan",
         "varus",
         "novus",
         "megamarket",
         "ekomarket",
         "torba",
         "ultramarket",
-        "metro",
-        "auchan"
+        "metro"
     ]
 
     try:
