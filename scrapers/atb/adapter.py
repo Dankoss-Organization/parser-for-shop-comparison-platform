@@ -49,7 +49,7 @@ class AtbAdapter(BaseAdapter):
                     if 'offers' in data and isinstance(data['offers'], dict):
                         regular_price = float(data['offers'].get('price', 0.0))
                     if 'description' in data:
-                        description = data.get('description', description)
+                        description = self.strip_html(data.get('description', description))
                     if 'brand' in data and isinstance(data['brand'], dict) and brand == "Невідомо":
                         brand = data['brand'].get('name', brand)
             except (json.JSONDecodeError, TypeError, ValueError):
@@ -104,12 +104,8 @@ class AtbAdapter(BaseAdapter):
             "brand": brand,
             "category": category,
             "country": "Україна",
-            "media": {
-                "raw_main_image": img_url,
-                "raw_gallery": [],
-                "main_image": cloud_main_image_url,
-                "gallery": []
-            },
+            "raw_main_image": img_url,
+            "main_image": cloud_main_image_url,
             "measurements": measurements,
             "pricing_logic": {"sales_unit": "piece", "unit_step": 1},
             "specific_attributes": {

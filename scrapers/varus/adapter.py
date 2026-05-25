@@ -49,7 +49,7 @@ class VarusAdapter(BaseAdapter):
 
         # 3. ОПИС
         raw_description = raw_data.get("description") or ""
-        clean_description = re.sub(r'<[^>]+>', '', str(raw_description)).strip()
+        clean_description = self.strip_html(raw_description)
 
         # 4. КАТЕГОРІЇ
         category_name = "Інше"
@@ -101,12 +101,8 @@ class VarusAdapter(BaseAdapter):
             "brand": brand_name,
             "category": category_name,
             "country": country_name,
-            "media": {
-                "raw_main_image": raw_main_image_url,
-                "raw_gallery": [],
-                "main_image": new_image,
-                "gallery": []
-            },
+            "raw_main_image": raw_main_image_url,
+            "main_image": new_image,
             "measurements": measurements,
             "pricing_logic": {"sales_unit": "piece", "unit_step": 1},
             "specific_attributes": {
