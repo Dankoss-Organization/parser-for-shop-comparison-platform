@@ -42,9 +42,27 @@ class ZakazApiClient:
             print(f"❌ Помилка завантаження категорій: {e}")
             return []
 
+        WHITELIST = {"food-babies"}
+        BLACKLIST = {"health-and-lifestyle-novus", "tobacco-456", "household-and-cleaning", "household-chemicals", "babies", "for-animals",
+                     "personal-hygiene", "kitchenware", "hobby", "stationery", "interior-and-textiles-novus", "clothes-and-shoes-novus", "discount-love-auchan", "bioproducts-and-diabetic-goods-auchan",
+                     "household-and-pets-care-auchan", "household-chemicals-auchan", "babies-auchan", "for-animals-auchan", "personal-hygiene-auchan",
+                     "world-cuisine-auchan", "kitchenware-auchan", "hobby-auchan", "stationery-auchan", "home-appliances-auchan", "interior-and-textiles-auchan", "clothes-and-shoes-auchan",
+                     "gourmet-auchan", "low-price-auchan", "health-and-lifestyle-ekomarket", "household-goods-ekomarket", "babies-ekomarket",
+                     "chemicals-ekomarket", "for-animals-ekomarket", "personal-hygiene-ekomarket", "kitchenware-ekomarket", "hobby-and-rest-ekomarket",
+                     "interior-and-textiles-ekomarket", "clothes-and-shoes-ekomarket", "all-stationery-ekomarket", "special-offers-metro", "special-offerings-metro", "health-and-lifestyle-metro",
+                     "household-goods-metro", "hobby-and-rest-metro", "chemicals-metro", "babies-metro", "personal-hygiene-metro",
+                     "stationery-metro", "kitchenware-metro", "home-interior-and-textiles-metr", "for-animals-metro"}
+
         for idx, cat in enumerate(categories, 1):
             cat_id = cat.get("id")
             if not cat_id: continue
+
+            if cat_id in WHITELIST:
+                print(f"   🎯 [{idx}/{len(categories)}] Категорія '{cat_id}' у ВАЙТЛІСТІ. Парсимо!")
+
+            elif cat_id in BLACKLIST:
+                print(f"   ⏭️ [{idx}/{len(categories)}] Категорію '{cat_id}' ПРОПУЩЕНО (чорний список)")
+                continue
 
             print(f"   ⬇️ [{idx}/{len(categories)}] Категорія '{cat_id}'...", end="", flush=True)
             page = 1

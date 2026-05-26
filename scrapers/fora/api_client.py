@@ -141,7 +141,7 @@ class ForaApiClient:
                         "merchantId": 2,
                         "deliveryType": 2,
                         "filialId": filial_id,
-                        "categoryId": cat_id,  # 👈 МАГІЯ ТУТ: Фільтруємо за числовим ID
+                        "categoryId": cat_id,
                         "From": page * step + 1,
                         "To": (page + 1) * step,
                         "businessId": 1

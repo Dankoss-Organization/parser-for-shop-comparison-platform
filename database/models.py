@@ -111,7 +111,7 @@ class Offer(Base):
 
     current_price = Column(Float)  # Price is strictly numerical for calculations
     discount_price = Column(Float, nullable=True)
-
+    discount_condition = Column(String, nullable=True)
     createdAt = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updatedAt = Column(DateTime, default=lambda: datetime.now(timezone.utc),
                        onupdate=lambda: datetime.now(timezone.utc))
