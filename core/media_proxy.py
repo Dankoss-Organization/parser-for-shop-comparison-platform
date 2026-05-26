@@ -36,7 +36,8 @@ class CloudinaryImageProxy:
                 cloud_name=CLOUDINARY_CLOUD_NAME,
                 api_key=CLOUDINARY_API_KEY,
                 api_secret=CLOUDINARY_API_SECRET,
-                secure=True
+                secure=True,
+                max_connections = 16
             )
             CloudinaryImageProxy._initialized = True
 

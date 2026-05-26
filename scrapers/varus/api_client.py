@@ -1,189 +1,316 @@
-import os
+"""
+VarusApiClient — HTTP client for the Varus product catalog API.
+
+The Varus website is powered by Vue Storefront with an Elasticsearch backend
+exposed at /api/catalog/.../product_v2/_search. Products are organised into a
+category tree; the most efficient discovery strategy is to query each category
+separately and paginate with from/size offsets.
+
+Previous approach (ID-pagination over the whole catalogue) had two problems:
+1. It fetched every product regardless of category relevance.
+2. It relied on a local file cache that went stale silently.
+
+Current approach:
+1. Iterate over CATEGORY_IDS (curated list of food/grocery categories).
+2. For each category, paginate until the page is empty.
+3. Collect product IDs and return them as the slug list.
+"""
+
 import json
+import logging
 import requests
 from typing import List, Dict, Any, Optional
 
+logger = logging.getLogger(__name__)
+
 
 class VarusApiClient:
-    SHOP_ID = "130551"
-    BASE_URL_SEARCH = "https://varus.ua/api/catalog/vue_storefront_catalog_2/product_v2/_search"
-    BASE_URL_GRAPHQL = "https://ai.esputnik.com/graphql"
+    """
+    Stateless HTTP client for the Varus catalog search API.
 
-    HEADERS_SEARCH = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Accept": "application/json"
-    }
+    All methods are static — the class acts as a namespace for related
+    functions rather than holding per-instance state.
 
-    HEADERS_GRAPHQL = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    Attributes:
+        SHOP_ID (str): Varus region/shop identifier used in every request.
+            Confirmed from browser network traffic: shop_id=57.
+        BASE_URL (str): Elasticsearch search proxy endpoint.
+        PAGE_SIZE (int): Products per page. 40 matches the browser's default;
+            can be raised to 100 without triggering rate limits.
+        CATEGORY_IDS (List[int]): Curated list of grocery category IDs.
+            Add or remove IDs here to control which sections are scraped.
+            To find new category IDs: open Varus in DevTools → Network →
+            filter by "_search" → look at the category_ids filter in the request.
+    """
+
+    SHOP_ID = "57"
+    BASE_URL = "https://varus.ua/api/catalog/vue_storefront_catalog_2/product_v2/_search"
+    PAGE_SIZE = 100  # Safe upper limit; Elasticsearch default max is 10 000
+
+    # ------------------------------------------------------------------ #
+    #  CATEGORY IDS                                                        #
+    #  Grouped by section for readability. Add new IDs as needed.         #
+    # ------------------------------------------------------------------ #
+    CATEGORY_IDS: List[int] = [
+        # Фрукти, овочі, горіхи
+        53253,
+        # М'ясо та напівфабрикати
+        53028,
+        # Риба та морепродукти
+        53051,
+        # Алкоголь
+        53297,
+        # Ковбаси, сосиски, делікатеси
+        53029,
+        # Сири
+        53048,
+        # Молочні продукти та яйця
+        53036,
+        # Бакалія
+        52876,
+        # Хлібобулочні вироби
+        53273,
+        # Кондитерські вироби та солодощі
+        52971,
+        #Чай, кава, гарячі напої
+        52905,
+        #Вода, соки, напої
+        52956,
+        #Снеки
+        52922,
+        #Заморожені продукти
+        52962,
+        #Консервація та соління
+        58295,
+        #Тютюнові вироби
+        53249
+    ]
+
+    HEADERS = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:151.0) "
+            "Gecko/20100101 Firefox/151.0"
+        ),
         "Accept": "application/json",
+        "Accept-Language": "uk-UA,uk;q=0.9",
+        "Referer": "https://varus.ua/",
         "Content-Type": "application/json",
-        "Origin": "https://varus.ua",
-        "Referer": "https://varus.ua/"
     }
 
-    # Шлях до файлу кешу (створиться папка cache біля main.py)
-    CACHE_DIR = os.path.join(os.getcwd(), "cache")
-    CACHE_FILE = os.path.join(CACHE_DIR, "varus_slugs.json")
+    # Fields we need for discovery (minimal set → faster response)
+    _DISCOVERY_FIELDS = "id,sku"
 
-    @staticmethod
-    def fetch_all_slugs() -> List[str]:
-        # ==========================================
-        # 1. ПЕРЕВІРКА КЕШУ
-        # ==========================================
-        if os.path.exists(VarusApiClient.CACHE_FILE):
-            print(f"📦 Знайдено збережений кеш товарів: {VarusApiClient.CACHE_FILE}")
-            try:
-                with open(VarusApiClient.CACHE_FILE, "r", encoding="utf-8") as f:
-                    slugs = json.load(f)
-                print(f"   ✅ Миттєво завантажено {len(slugs)} унікальних товарів з файлу.")
-                return slugs
-            except Exception as e:
-                print(f"   ⚠️ Помилка читання кешу ({e}), збираємо заново...")
+    # Fields we need for full product detail
+    _DETAIL_FIELDS = (
+        "sku,id,name,sqpp_data_region_default,weight,volume,"
+        "is_18_plus,is_tobacco,brand_data,description,"
+        "category,countrymanufacturerforsite,image"
+    )
 
-        print("🔍 [VARUS] Починаємо збір ВСІХ товарів (Обхід лімітів через ID-пагінацію)...")
-        slugs = set()
-        size = 1000
-        last_seen_id = 0  # Зберігатимемо ID останнього товару
+    # ------------------------------------------------------------------ #
+    #  Discovery                                                           #
+    # ------------------------------------------------------------------ #
 
-        # ==========================================
-        # 2. БЕЗКІНЕЧНИЙ ЦИКЛ ПО ID
-        # ==========================================
+    @classmethod
+    def fetch_all_slugs(cls) -> List[str]:
+        """
+        Collects product IDs from all configured categories.
+
+        For each category in ``CATEGORY_IDS``, paginates through products
+        in batches of ``PAGE_SIZE`` until an empty page is returned.
+
+        Returns:
+            List[str]: Deduplicated product IDs ready to be passed to
+                ``fetch_detailed_product``.
+
+        Note:
+            Uses a set internally to deduplicate products that appear in
+            multiple categories (e.g. a product in both "Молоко" and
+            "Молочні продукти").
+        """
+        all_ids: set[str] = set()
+
+        for category_id in cls.CATEGORY_IDS:
+            logger.info("[Varus] Збираємо категорію %d...", category_id)
+            ids_in_category = cls._fetch_category_slugs(category_id)
+            new = len(ids_in_category - all_ids)
+            all_ids.update(ids_in_category)
+            logger.info(
+                "[Varus] Категорія %d: %d товарів (%d нових). Всього: %d",
+                category_id, len(ids_in_category), new, len(all_ids),
+            )
+
+        return list(all_ids)
+
+    @classmethod
+    def _fetch_category_slugs(cls, category_id: int) -> set:
+        """
+        Paginates through a single category and returns all product IDs.
+
+        Uses ``from`` + ``size`` offset pagination. Stops when the returned
+        page is shorter than ``PAGE_SIZE`` (last page reached).
+
+        Args:
+            category_id (int): Elasticsearch category identifier.
+
+        Returns:
+            set[str]: Product IDs found in this category.
+        """
+        ids: set[str] = set()
+        offset = 0
+
         while True:
-            payload = {
-                "_availableFilters": [],
-                "_appliedFilters": [
-                    {"attribute": "status", "value": {"in": [0, 1]}, "scope": "default"},
-                    {"attribute": "visibility", "value": {"in": [2, 4]}, "scope": "default"}
-                ],
-                # Обов'язково сортуємо по ID, щоб вони йшли по порядку
-                "_appliedSort": [{"field": "id", "options": {"order": "asc"}}],
-                "_searchText": ""
-            }
-
-            # Якщо це не перший запит, просимо товари з ID більшим за останній
-            if last_seen_id > 0:
-                payload["_appliedFilters"].append(
-                    {"attribute": "id", "value": {"gt": last_seen_id}, "scope": "default"}
-                )
-
+            payload = cls._build_category_payload(category_id)
             params = {
-                "_source_include": "id,sku",
-                "from": 0,  # Завжди 0! Ми більше не впремося в ліміт 10000
-                "size": size,
-                "shop_id": VarusApiClient.SHOP_ID,
+                "_source_include": cls._DISCOVERY_FIELDS,
+                "from": offset,
+                "size": cls.PAGE_SIZE,
+                "shop_id": cls.SHOP_ID,
                 "request": json.dumps(payload),
                 "request_format": "search-query",
-                "response_format": "compact"
+                "response_format": "compact",
+                "sort": "",
             }
 
             try:
-                response = requests.get(VarusApiClient.BASE_URL_SEARCH, params=params,
-                                        headers=VarusApiClient.HEADERS_SEARCH, timeout=15)
-                response.raise_for_status()
-                data = response.json()
-
-                items = []
-                if isinstance(data, list):
-                    items = data
-                elif isinstance(data, dict):
-                    hits_outer = data.get("hits", [])
-                    if isinstance(hits_outer, list):
-                        items = hits_outer
-                    elif isinstance(hits_outer, dict):
-                        items = hits_outer.get("hits", [])
-
-                if not items:
-                    print("   🏁 Нових товарів більше немає. Збір завершено!")
-                    break
-
-                current_batch = 0
-                for item in items:
-                    if not isinstance(item, dict): continue
-                    source = item.get("_source", item)
-
-                    product_id = source.get("id") or source.get("sku")
-                    if product_id:
-                        slugs.add(str(product_id))
-                        current_batch += 1
-
-                # Беремо ID найостаннішого товару з пачки для наступного запиту
-                last_item_source = items[-1].get("_source", items[-1]) if isinstance(items[-1], dict) else items[-1]
-                try:
-                    last_seen_id = int(last_item_source.get("id"))
-                except:
-                    print("   ⚠️ Не вдалося отримати ID останнього товару, зупиняємось.")
-                    break
-
-                print(
-                    f"   📥 Завантажено пачку {current_batch} шт. (Наступний запит з ID > {last_seen_id}). Всього унікальних: {len(slugs)}")
-
-                # Якщо прийшло менше 1000, значить ми доскребли дно бази
-                if len(items) < size:
-                    print("   🏁 Це була остання сторінка.")
-                    break
-
-            except Exception as e:
-                print(f"   ⚠️ Помилка на ID {last_seen_id}: {e}")
+                items = cls._get_items(params)
+            except Exception as exc:
+                logger.warning(
+                    "[Varus] Помилка для категорії %d (offset=%d): %s",
+                    category_id, offset, exc,
+                )
                 break
 
-        # ==========================================
-        # 3. ЗБЕРЕЖЕННЯ У ФАЙЛ (КЕШУВАННЯ)
-        # ==========================================
-        if slugs:
-            os.makedirs(VarusApiClient.CACHE_DIR, exist_ok=True)
-            with open(VarusApiClient.CACHE_FILE, "w", encoding="utf-8") as f:
-                json.dump(list(slugs), f, ensure_ascii=False, indent=4)
-            print(
-                f"\n💾 БІНГО! Унікальні товари ({len(slugs)} шт.) успішно збережено у файл {VarusApiClient.CACHE_FILE}!")
+            if not items:
+                break  # Empty page → we've exhausted this category
 
-        return list(slugs)
+            for item in items:
+                source = item.get("_source", item) if isinstance(item, dict) else {}
+                pid = source.get("id") or source.get("sku")
+                if pid:
+                    ids.add(str(pid))
+
+            print(
+                f"   [Varus] Категорія {category_id} | "
+                f"offset={offset} | сторінка={len(items)} | всього в категорії={len(ids)}"
+            )
+
+            if len(items) < cls.PAGE_SIZE:
+                break  # Last (partial) page
+
+            offset += cls.PAGE_SIZE
+
+        return ids
 
     @staticmethod
-    def fetch_detailed_product(slug: str) -> Optional[Dict[str, Any]]:
-        # ==========================================
-        # ЄДИНИЙ ЗАПИТ: Elasticsearch (Тепер дістає ВСЕ!)
-        # ==========================================
-        payload_search = {
+    def _build_category_payload(category_id: int) -> dict:
+        """
+        Builds the Elasticsearch query payload for a single category.
+
+        Filters:
+        - ``visibility`` in [2, 4] (catalog + catalog+search)
+        - ``status`` in [0, 1] (enabled products)
+        - ``category_ids`` in [category_id]
+        - ``sqpp_data_region_default.in_stock`` = true (in-stock only)
+
+        Args:
+            category_id (int): Category to filter by.
+
+        Returns:
+            dict: JSON-serialisable payload for the ``request`` query parameter.
+        """
+        return {
             "_availableFilters": [],
             "_appliedFilters": [
-                {"attribute": "id", "value": {"in": [slug]}, "scope": "default"}
+                {"attribute": "visibility", "value": {"in": [2, 4]}, "scope": "default"},
+                {"attribute": "status", "value": {"in": [0, 1]}, "scope": "default"},
+                {"attribute": "category_ids", "value": {"in": [category_id]}, "scope": "default"},
+                {"attribute": "sqpp_data_region_default.in_stock", "value": {"or": True}, "scope": "default"},
             ],
-            "_searchText": ""
+            "_appliedSort": [{"field": "id", "options": {"order": "asc"}}],
+            "_searchText": "",
         }
 
-        params_search = {
-            # ЗВЕРНИ УВАГУ: тут ми додали brand_data, description, category, countrymanufacturerforsite, image
-            "_source_include": "sku,id,name,sqpp_data_region_default,weight,volume,is_18_plus,is_tobacco,brand_data,description,category,countrymanufacturerforsite,image",
+    # ------------------------------------------------------------------ #
+    #  Detail fetch                                                        #
+    # ------------------------------------------------------------------ #
+
+    @classmethod
+    def fetch_detailed_product(cls, product_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Fetches full product data for a single product ID.
+
+        Args:
+            product_id (str): Numeric product ID as a string (from ``fetch_all_slugs``).
+
+        Returns:
+            dict | None: Product source dict, or None if not found / request failed.
+        """
+        payload = {
+            "_availableFilters": [],
+            "_appliedFilters": [
+                {"attribute": "id", "value": {"in": [product_id]}, "scope": "default"}
+            ],
+            "_searchText": "",
+        }
+        params = {
+            "_source_include": cls._DETAIL_FIELDS,
             "from": 0,
             "size": 1,
-            "shop_id": VarusApiClient.SHOP_ID,
-            "request": json.dumps(payload_search),
+            "shop_id": cls.SHOP_ID,
+            "request": json.dumps(payload),
             "request_format": "search-query",
-            "response_format": "compact"
+            "response_format": "compact",
         }
 
         try:
-            resp = requests.get(VarusApiClient.BASE_URL_SEARCH, params=params_search,
-                                headers=VarusApiClient.HEADERS_SEARCH, timeout=10)
-            if resp.status_code == 200:
-                data = resp.json()
-
-                # Наша надійна перевірка JSON, яку ми відшліфували раніше
-                items = []
-                if isinstance(data, list):
-                    items = data
-                elif isinstance(data, dict):
-                    hits_outer = data.get("hits", [])
-                    if isinstance(hits_outer, list):
-                        items = hits_outer
-                    elif isinstance(hits_outer, dict):
-                        items = hits_outer.get("hits", [])
-
-                if items and isinstance(items[0], dict):
-                    return items[0].get("_source", items[0])
-
-        except Exception as e:
-            print(f"   ⚠️ Помилка отримання деталей для {slug}: {e}")
+            items = cls._get_items(params)
+            if items and isinstance(items[0], dict):
+                return items[0].get("_source", items[0])
+        except Exception as exc:
+            logger.warning("[Varus] Помилка деталей для %s: %s", product_id, exc)
 
         return None
+
+    # ------------------------------------------------------------------ #
+    #  Shared HTTP helper                                                  #
+    # ------------------------------------------------------------------ #
+
+    @classmethod
+    def _get_items(cls, params: dict) -> list:
+        """
+        Executes a GET request and extracts the hits array from the response.
+
+        Handles both list responses (compact mode) and nested
+        ``{"hits": {"hits": [...]}}`` Elasticsearch responses.
+
+        Args:
+            params (dict): Query parameters for the search endpoint.
+
+        Returns:
+            list: Raw item list (may be empty).
+
+        Raises:
+            requests.HTTPError: If the server returns a non-2xx status.
+            ValueError: If the response body cannot be parsed as JSON.
+        """
+        resp = requests.get(
+            cls.BASE_URL,
+            params=params,
+            headers=cls.HEADERS,
+            timeout=15,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+
+        if isinstance(data, list):
+            return data
+
+        if isinstance(data, dict):
+            hits_outer = data.get("hits", [])
+            if isinstance(hits_outer, list):
+                return hits_outer
+            if isinstance(hits_outer, dict):
+                return hits_outer.get("hits", [])
+
+        return []
