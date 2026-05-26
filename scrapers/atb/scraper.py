@@ -27,12 +27,7 @@ class AtbScraper(BaseScraper):
             "292-alkogol-i-tyutyun",
             "502-kulinariya",
             "415-yapons-ka-kukhnya",
-            "339-dityache-kharchuvannya",
-            "373-tovari-dlya-ditey",
-            "290-gigiena-i-kosmetika",
-            "308-pobutova-khimiya-ta-neprodovol-chi-tovari",
-            "358-tovari-dlya-domu",
-            "436-tovari-dlya-tvarin"
+            "339-dityache-kharchuvannya"
         ]
         self.cache_file = "cache/atb_slugs.json"
 
