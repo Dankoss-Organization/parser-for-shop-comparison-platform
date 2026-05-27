@@ -368,7 +368,7 @@ class ScrapingDashboard:
         )
 
         workers = self._workers_var.get()
-        prog_queue = queue.Queue()
+        prog_queue = queue.Queue(maxsize=500)  # bounded: engine drops events when full (see _notify)
         self._engine = ParallelScrapingEngine(
             stores=selected,
             workers_per_store=workers,
@@ -412,35 +412,49 @@ class ScrapingDashboard:
     # Progress event handling (called from worker threads via root.after)
     # ------------------------------------------------------------------
 
+    # Maximum log lines kept in the Text widget. Tkinter re-renders all visible
+    # text on every insert — unbounded growth makes each insert progressively slower.
+    _LOG_MAX_LINES = 2000
+    # Events consumed per poll cycle. Caps GUI work per 50ms frame so the
+    # Tkinter event loop stays responsive even during burst traffic.
+    _POLL_BATCH = 50
+
     def _poll_progress(self, prog_queue: queue.Queue):
         """
-        Polls the progress queue every 50ms and applies events to the GUI.
+        Polls the progress queue every 50ms and applies up to _POLL_BATCH events.
 
-        This is the correct Tkinter threading pattern:
-        - Worker threads put events on a queue.Queue (thread-safe).
-        - The main thread polls via root.after() — never calls Tkinter from workers.
+        Limiting events per cycle is critical: an unbounded drain blocks the
+        Tkinter event loop for the entire duration of all _log_line calls,
+        freezing the GUI. With a cap of 50 events × ~0.5ms each ≈ 25ms per
+        frame — well within the 50ms scheduling interval.
 
         Args:
             prog_queue: The shared progress queue owned by the engine.
         """
+        processed = 0
         try:
-            while True:
+            while processed < self._POLL_BATCH:
                 event = prog_queue.get_nowait()
                 self._apply_event(event)
+                processed += 1
         except queue.Empty:
             pass
 
-        # If engine is still running, keep polling
         if self._engine_thread and self._engine_thread.is_alive():
             self.root.after(50, lambda: self._poll_progress(prog_queue))
         else:
-            # Drain any remaining events after engine finishes
-            try:
-                while True:
-                    self._apply_event(prog_queue.get_nowait())
-            except queue.Empty:
-                pass
-
+            # Drain remaining events after engine stops, still rate-limited
+            # per frame to avoid a final freeze on large queues.
+            def _drain():
+                drained = 0
+                try:
+                    while drained < self._POLL_BATCH:
+                        self._apply_event(prog_queue.get_nowait())
+                        drained += 1
+                except queue.Empty:
+                    return
+                self.root.after(10, _drain)
+            _drain()
     def _on_progress_event(self, event):
         """Fallback callback for CLI mode (not used in GUI)."""
         pass
@@ -472,7 +486,11 @@ class ScrapingDashboard:
 
     def _log_line(self, message: str, level: str = "info"):
         """
-        Appends a coloured line to the log widget.
+        Appends a coloured line to the log widget, trimming old lines.
+
+        Trims the widget to _LOG_MAX_LINES when it grows too large.
+        Tkinter re-renders ALL text on every insert — without trimming,
+        each _log_line call gets progressively slower as the widget fills.
 
         Args:
             message (str): Text to append.
@@ -482,6 +500,13 @@ class ScrapingDashboard:
         ts = datetime.now().strftime("%H:%M:%S")
         self._log.insert("end", f"[{ts}] ", "dim")
         self._log.insert("end", message + "\n", level)
+
+        # Trim old lines to keep the widget responsive
+        line_count = int(self._log.index("end-1c").split(".")[0])
+        if line_count > self._LOG_MAX_LINES:
+            excess = line_count - self._LOG_MAX_LINES
+            self._log.delete("1.0", f"{excess + 1}.0")
+
         self._log.see("end")
         self._log.config(state="disabled")
 

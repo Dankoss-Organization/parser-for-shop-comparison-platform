@@ -405,13 +405,20 @@ class ParallelScrapingEngine:
                 slow_track_items.append((store, product))
 
         try:
-            # ── Fast Track: bulk price updates (1ms per item) ──
-            for store, product, store_sku in fast_track_items:
-                price = product["offers"][0]["pricing"]["current_price"]
+            # ── Fast Track: single bulk UPDATE for all known SKUs ──
+            # bulk_update_offer_prices does 2 DB round-trips regardless of batch size:
+            #   1 SELECT offers WHERE store_sku IN (...)
+            #   1 SELECT price_history WHERE offer_id IN (...)
+            # vs previous O(2N) approach: 50 items × 2 queries × 300ms = 30s → ~600ms
+            if fast_track_items:
+                bulk_updates = [
+                    (store_sku, product["offers"][0]["pricing"]["current_price"])
+                    for store, product, store_sku in fast_track_items
+                ]
                 try:
-                    router.repo.update_offer_price_by_sku(store_sku, price)
+                    router.repo.bulk_update_offer_prices(bulk_updates)
                 except Exception as exc:
-                    logger.error(f"Fast track failed [{store}]: {exc}")
+                    logger.error(f"Fast track bulk update failed: {exc}")
 
             # ── Slow Track: BATCH ML encoding ──────────────────────────────
             # KEY OPTIMISATION: instead of calling model.encode() once per item

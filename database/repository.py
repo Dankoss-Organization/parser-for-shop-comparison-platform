@@ -287,7 +287,7 @@ class Repository:
 
     def update_offer_price_by_sku(self, store_sku: str, new_price: float):
         """
-        Updates the price of an offer identified by its store SKU.
+        Updates the price of a single offer identified by its store SKU.
 
         Fast path for Fast Track processing: no ML inference needed, just
         update the current_price field and record history.
@@ -302,3 +302,63 @@ class Repository:
             if hasattr(offer, 'updatedAt'):
                 offer.updatedAt = datetime.now(timezone.utc)
             self._record_price_history(offer.id, new_price, new_price)
+
+    def bulk_update_offer_prices(self, updates: list[tuple[str, float]]) -> None:
+        """
+        Updates prices for multiple offers in a single bulk operation.
+
+        Instead of N×(SELECT + UPDATE) round-trips to NeonDB, this method:
+        1. Fetches all matching offers in ONE SELECT … WHERE store_sku IN (…)
+        2. Updates them all in-memory (SQLAlchemy tracks dirty objects)
+        3. Records price history for changed prices (batched SELECT on PriceHistory)
+        4. Does NOT commit — caller owns the transaction boundary.
+
+        Performance: O(2) DB round-trips for any batch size vs O(2N) previously.
+        At 300ms NeonDB latency: 50 items → 600ms instead of 30 000ms.
+
+        Args:
+            updates: List of (store_sku, new_price) tuples.
+        """
+        if not updates:
+            return
+
+        price_map = {sku: price for sku, price in updates}
+        skus = list(price_map.keys())
+        now = datetime.now(timezone.utc)
+
+        # Single SELECT for all offers
+        offers = self.db.query(Offer).filter(Offer.store_sku.in_(skus)).all()
+
+        if not offers:
+            return
+
+        offer_ids = [o.id for o in offers]
+
+        # Single SELECT for all active price history records
+        active_histories = self.db.query(PriceHistory).filter(
+            PriceHistory.offer_id.in_(offer_ids),
+            PriceHistory.end_date == None
+        ).all()
+        history_map = {h.offer_id: h for h in active_histories}
+
+        for offer in offers:
+            new_price = price_map[offer.store_sku]
+            offer.current_price = new_price
+            if hasattr(offer, 'updatedAt'):
+                offer.updatedAt = now
+
+            # Inline price history update (avoid per-item SELECT)
+            active = history_map.get(offer.id)
+            if active and float(active.price) == float(new_price):
+                continue  # Price unchanged — skip history entry
+            if active:
+                active.end_date = now
+            new_history = PriceHistory(
+                id=str(uuid.uuid4()),
+                offer_id=offer.id,
+                price=new_price,
+                regular_price=new_price,
+                start_date=now,
+                end_date=None,
+            )
+            self.db.add(new_history)
