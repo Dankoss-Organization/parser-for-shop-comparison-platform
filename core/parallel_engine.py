@@ -404,34 +404,115 @@ class ParallelScrapingEngine:
             else:
                 slow_track_items.append((store, product))
 
-        # ── Execute both tracks ──
-        # ВАЖЛИВО: slow_track.find_match() всередині робить запити до БД через
-        # SQLAlchemy сесію. Сесія НЕ є thread-safe — не можна передавати її
-        # між потоками. Тому ML обробка виконується ПОСЛІДОВНО в цьому ж потоці
-        # (DB Consumer). Паралелізм досягається на рівні scraper workers (fetch),
-        # а не на рівні DB writes.
         try:
-            # Fast track: bulk price updates (sequential, ~1ms each)
+            # ── Fast Track: bulk price updates (1ms per item) ──
             for store, product, store_sku in fast_track_items:
                 price = product["offers"][0]["pricing"]["current_price"]
                 try:
                     router.repo.update_offer_price_by_sku(store_sku, price)
-                    logger.debug(f"⚡ Updated {store_sku} → {price} грн")
                 except Exception as exc:
                     logger.error(f"Fast track failed [{store}]: {exc}")
 
-            # Slow track: sequential ML + DB (session не thread-safe)
-            for store, product in slow_track_items:
-                try:
-                    router.process_scraped_item(product)
-                    logger.debug(f"🔗 Slow track OK [{store}]: {product.get(chr(39)+'canonical_name'+chr(39), chr(39)+'?'+chr(39))}")
-                except Exception as exc:
-                    logger.error(f"Slow track failed [{store}]: {exc}")
-                    try:
-                        router.repo.session.rollback()
-                    except Exception:
-                        pass
+            # ── Slow Track: BATCH ML encoding ──────────────────────────────
+            # KEY OPTIMISATION: instead of calling model.encode() once per item
+            # (3-10s each), we encode ALL new item names in a single forward
+            # pass through the neural network (one call, same total compute).
+            # For 50 items: 50 × 4s = 200s  →  1 batch call ≈ 5s  (40× faster)
+            #
+            # Flow per item:
+            #   1. Hard filters: brand + weight → get DB candidates (SQL, fast)
+            #   2. Collect (new_name, candidate_names) pairs for all items
+            #   3. Encode ALL names at once with encode_batch()
+            #   4. Compute cosine similarity per item (numpy dot product, <1ms)
+            #   5. Create/link products in DB
+            # ──────────────────────────────────────────────────────────────
 
+            if slow_track_items:
+                ml = router.slow_track.ml_matcher
+                normalizer = router.slow_track  # has .repo and uses clean_text
+
+                # Step 1: gather candidates from DB for each slow-track item
+                item_data = []  # list of (store, product, candidates)
+                all_texts = []  # flat list of ALL texts to encode in one batch
+
+                for store, product in slow_track_items:
+                    # Barcode shortcut — skip ML entirely if barcode matches
+                    barcode = product.get("specific_attributes", {}).get("barcode")
+                    if barcode:
+                        match = router.repo.find_product_by_barcode(barcode)
+                        if match:
+                            router.repo.create_offer(match.id, product["offers"][0], product["offers"][0]["sku"])
+                            continue
+
+                    brand = product.get("brand")
+                    weight_val = product.get("measurements", {}).get("value")
+
+                    if not brand or not weight_val:
+                        # No hard filters → create new product directly
+                        item_data.append((store, product, None, None))
+                        continue
+
+                    from core.resolution.normalizer import clean_text
+                    candidates = router.repo.find_products_by_brand_and_weight(brand, weight_val)
+                    new_name_clean = clean_text(product["canonical_name"])
+                    cand_names_clean = [clean_text(c.canonical_name) for c in candidates]
+
+                    item_data.append((store, product, candidates, cand_names_clean))
+
+                    # Collect all texts for batch encode
+                    all_texts.append(new_name_clean)
+                    all_texts.extend(cand_names_clean)
+
+                # Step 2: encode ALL texts in ONE call (the big speedup)
+                if all_texts:
+                    all_embeddings = ml.encode_batch(all_texts)
+                else:
+                    all_embeddings = None
+
+                # Step 3: resolve each item using pre-computed embeddings
+                emb_cursor = 0
+                for store, product, candidates, cand_names_clean in item_data:
+                    try:
+                        global_product_id = None
+
+                        if candidates is not None and cand_names_clean:
+                            # Slice out this item's embeddings from the flat array
+                            new_emb = all_embeddings[emb_cursor]
+                            n_cands = len(cand_names_clean)
+                            cand_embs = all_embeddings[emb_cursor + 1: emb_cursor + 1 + n_cands]
+                            emb_cursor += 1 + n_cands
+
+                            # Cosine similarity via dot product (embeddings pre-normalised)
+                            import numpy as np
+                            scores = np.dot(cand_embs, new_emb)
+                            best_idx = int(np.argmax(scores))
+                            best_score = float(scores[best_idx])
+
+                            from core.resolution.normalizer import clean_text
+                            new_name_clean = clean_text(product["canonical_name"])
+                            print(f"   🤖 ML Аналіз: '{new_name_clean}' -> Збіг {best_score * 100:.1f}%")
+
+                            if best_score >= 0.96:
+                                global_product_id = candidates[best_idx].id
+                        elif candidates is not None:
+                            emb_cursor += 1  # new_name was encoded but no candidates
+
+                        if global_product_id:
+                            print(f"   🔗 Прив'язуємо до існуючого товару: {global_product_id}")
+                        else:
+                            print("   ✨ Створюємо новий глобальний товар у базі.")
+                            global_product_id = router.repo.create_product(product)
+
+                        router.repo.create_offer(global_product_id, product["offers"][0], product["offers"][0]["sku"])
+
+                    except Exception as exc:
+                        logger.error(f"Slow track failed [{store}]: {exc}")
+                        try:
+                            router.repo.session.rollback()
+                        except Exception:
+                            pass
+
+            # Single COMMIT for entire batch
             try:
                 router.repo.session.commit()
             except Exception:
