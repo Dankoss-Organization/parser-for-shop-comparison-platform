@@ -263,3 +263,42 @@ class Repository:
         except Exception as e:
             self.db.rollback()
             raise e
+    # ────────────────────────────────────────────────────────────────── #
+    #  BATCH OPERATIONS (для паралельної обробки у DB Consumer)           #
+    # ────────────────────────────────────────────────────────────────── #
+
+    def find_offers_by_store_skus(self, store_skus: list):
+        """
+        Retrieves multiple offers by their store SKUs in a single query.
+
+        Advantages:
+        - O(1) query instead of O(n) individual lookups
+        - Significantly faster for batch processing
+
+        Args:
+            store_skus (list): List of store-specific SKU strings.
+
+        Returns:
+            list[Offer]: Found offer objects.
+        """
+        if not store_skus:
+            return []
+        return self.db.query(Offer).filter(Offer.store_sku.in_(store_skus)).all()
+
+    def update_offer_price_by_sku(self, store_sku: str, new_price: float):
+        """
+        Updates the price of an offer identified by its store SKU.
+
+        Fast path for Fast Track processing: no ML inference needed, just
+        update the current_price field and record history.
+
+        Args:
+            store_sku (str): Store-specific SKU.
+            new_price (float): New price to set.
+        """
+        offer = self.db.query(Offer).filter(Offer.store_sku == store_sku).first()
+        if offer:
+            offer.current_price = new_price
+            if hasattr(offer, 'updatedAt'):
+                offer.updatedAt = datetime.now(timezone.utc)
+            self._record_price_history(offer.id, new_price, new_price)
