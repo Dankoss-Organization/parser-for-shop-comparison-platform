@@ -1,0 +1,15 @@
+name: Deploy docs page
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  call-devops-workflow:
+    uses: Dankoss-Organization/devops-ecosystem/.github/workflows/deploy-docs-template.yml@main
+    with:
+      language: 'python'
+      python-version: '3.11'
+      build-command: |
+        export PYTHONPATH=$PYTHONPATH:$(pwd)
+        find core database scrapers -type d -exec touch {}/__init__.py \;
+        pdoc core database scrapers -o ./docs --docformat google
