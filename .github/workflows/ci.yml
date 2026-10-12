@@ -1,0 +1,41 @@
+name: CI Pipeline (Parser)
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  lint-infra:
+    uses: Dankoss-Organization/devops-ecosystem/.github/workflows/lint-infra.yml@main
+
+  lint-code:
+    uses: Dankoss-Organization/devops-ecosystem/.github/workflows/lint-python.yml@main
+    with:
+      python-version: '3.11'
+
+  test:
+    needs: lint-code
+    uses: Dankoss-Organization/devops-ecosystem/.github/workflows/test-python.yml@main
+    with:
+      python-version: '3.11'
+
+  security:
+    needs: test
+    uses: Dankoss-Organization/devops-ecosystem/.github/workflows/security-scan.yml@main
+
+  deploy-docs:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: security
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: Dankoss-Organization/devops-ecosystem/.github/workflows/deploy-gh-pages.yml@main
+    with:
+      build-command: |
+        export PYTHONPATH=$PYTHONPATH:$(pwd)
+        find core database scrapers -type d -exec touch {}/__init__.py \;
+        pdoc core database scrapers -o ./docs --docformat google
+      docs-dir: './docs'
